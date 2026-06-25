@@ -1,0 +1,208 @@
+/* ==================================================================
+   Circuit — global tokens + base styles
+   Direction: "embedding field / architect plotter on technical paper".
+   Canonical values live in lib/design/tokens.ts; mirror changes here.
+   ================================================================== */
+
+:root {
+  /* ---- Core palette ---- */
+  --paper:        #EEF1F4;
+  --ink:          #14143C;
+  --vector:       #2B2BF5;
+  --oxblood:      #8A2233;
+  --graphite:     #5A5F6B;
+  --paper-2:      #E3E8EE;
+  --line:         #cfd6df;
+  --line-soft:    #dbe1e9;
+
+  /* ---- Semantic aliases (consumed by primitives) ---- */
+  --color-ink:        var(--ink);
+  --color-surface:    var(--paper);
+  --color-panel:      var(--paper);
+  --color-line:       var(--line);
+
+  --color-violet:      var(--vector);
+  --color-violet-soft: #E8E8FE;
+  --color-live:        var(--oxblood);
+  --color-live-soft:   #F5E0E3;
+  --color-go:          #0E9F6E;
+  --color-go-soft:     #DEF5EC;
+
+  --color-muted:      var(--graphite);
+  --color-muted-soft: #9aa2af;
+  --color-on-dark:    var(--paper);
+
+  /* ---- Fonts (next/font wires the --font-* vars in layout.tsx) ---- */
+  --font-display: var(--font-fraunces), "Fraunces", serif;
+  --font-body:    var(--font-ibm-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono:    var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+
+  /* ---- Radii ---- */
+  --r:           10px;
+  --radius-sm:   8px;
+  --radius-md:   10px;
+  --radius-lg:   10px;
+  --radius-xl:   10px;
+  --radius-2xl:  10px;
+  --radius-pill: 999px;
+
+  /* ---- Spacing (4px rhythm) ---- */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---- Shadows — hard offset, plotter instrument style ---- */
+  --shadow-card:  6px 6px 0 rgba(20,20,60,0.08);
+  --shadow-inset: 0 1px 2px rgba(0,0,0,0.08);
+  --shadow-modal: 8px 8px 0 rgba(20,20,60,0.12);
+  --shadow-focus: 0 0 0 3px rgba(43,43,245,0.28);
+
+  /* ---- Motion ---- */
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ---------------- Reset ---------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "tnum" 1;
+
+  /* Faint plotter grid on the paper — the signature texture */
+  background-image:
+    linear-gradient(var(--line-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+}
+
+/* Fraunces is a variable opsz serif — let the display type size optically. */
+html {
+  font-optical-sizing: auto;
+}
+
+/* ---------------- Focus: vector-blue ring everywhere -------------- */
+:focus-visible {
+  outline: 2px solid var(--vector);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------------- Spinner (used by vec-spin class) ---------------- */
+@keyframes vec-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.vec-spin {
+  animation: vec-spin 0.75s linear infinite;
+}
+
+/* ---------------- Signature: live pulse (oxblood) ----------------- */
+@keyframes vector-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(138, 34, 51, 0.55); }
+  70%  { box-shadow: 0 0 0 6px rgba(138, 34, 51, 0); }
+  100% { box-shadow: 0 0 0 0   rgba(138, 34, 51, 0); }
+}
+
+/* ---------------- Scrollbar (subtle, on-brand) -------------------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: var(--radius-pill);
+  border: 3px solid var(--paper);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::selection {
+  background: var(--color-violet-soft);
+  color: var(--ink);
+}
+
+/* ---------------- Reduced motion ---------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
