@@ -4,6 +4,7 @@ import {
   Users,
   Map,
   Calendar,
+  CalendarRange,
   MessageCircle,
   Clock,
   Activity,
@@ -27,9 +28,9 @@ export interface NavGroup {
  * two halves:
  *  - "Your build"  — the daily solo loop (the spine).
  *  - "Community"   — the always-on graph: who's building, what's stuck.
- *  - "At an event" — episode-scoped surfaces; these light up during a live event
- *                    (Phase 3 makes events first-class; until then they run on
- *                    the seeded/sim data they always did).
+ *  - "At an event" — events as first-class episodes (browse/join), plus the
+ *                    episode-scoped surfaces (schedule/maps/deadline) that light
+ *                    up during a live event.
  *
  * Everything is always listed (no mode gate) so nothing is hidden.
  */
@@ -53,6 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "At an event",
     items: [
+      { label: "Events", href: "/events", Icon: CalendarRange },
       { label: "Schedule", href: "/schedule", Icon: Calendar },
       { label: "Maps", href: "/maps", Icon: Map },
       { label: "Deadline", href: "/deadline", Icon: Clock },
