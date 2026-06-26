@@ -10,9 +10,9 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing, letterSpacing } fr
 
 type FeedTab = "stuck" | "shipped"
 
-export function RadarFeed() {
+export function RadarFeed({ eventId }: { eventId?: string | null } = {}) {
   const [tab, setTab] = React.useState<FeedTab>("stuck")
-  const { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump } = useRadar()
+  const { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump } = useRadar(eventId)
   // Your just-posted blocker (id-stable, set from post()'s returned id).
   const [latestId, setLatestId] = React.useState<string | null>(null)
   // A node that just took a cross-client "me too" (transient pulse).
@@ -98,7 +98,7 @@ export function RadarFeed() {
         })}
       </div>
 
-      {tab === "shipped" && <BuildLogFeed />}
+      {tab === "shipped" && <BuildLogFeed eventId={eventId} />}
 
       {tab === "stuck" && (
         <>

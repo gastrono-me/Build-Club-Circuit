@@ -9,12 +9,14 @@ export interface BuildLogRow {
   category: string
   note: string
   created_at: string
+  event_id?: string | null
   /** Joined from profiles */
   author_name?: string | null
   author_avatar?: string | null
 }
 
-export function useBuildLog() {
+/** Pass an event id to scope the feed to one episode; omit/null for the global feed. */
+export function useBuildLog(eventId?: string | null) {
   const [posts, setPosts] = useState<BuildLogRow[]>([])
   const [cheerCounts, setCheerCounts] = useState<Record<string, number>>({})
   const [mineCheers, setMineCheers] = useState<Set<string>>(new Set())
@@ -30,7 +32,7 @@ export function useBuildLog() {
     userIdRef.current = uid
     setUserId(uid)
 
-    const { data: postData, error: postErr } = await supabase
+    let postQuery = supabase
       .from("build_log")
       .select(`
         id,
@@ -38,9 +40,12 @@ export function useBuildLog() {
         category,
         note,
         created_at,
+        event_id,
         profiles:author_id ( name, avatar_url )
       `)
       .order("created_at", { ascending: false })
+    if (eventId) postQuery = postQuery.eq("event_id", eventId)
+    const { data: postData, error: postErr } = await postQuery
 
     if (postErr) {
       console.error("[useBuildLog] posts fetch error:", postErr)
@@ -69,6 +74,7 @@ export function useBuildLog() {
       category: p.category,
       note: p.note,
       created_at: p.created_at,
+      event_id: p.event_id ?? null,
       author_name: p.profiles?.name ?? null,
       author_avatar: p.profiles?.avatar_url ?? null,
     }))
@@ -77,7 +83,7 @@ export function useBuildLog() {
     setCheerCounts(counts)
     setMineCheers(mine)
     setLoading(false)
-  }, [])
+  }, [eventId])
 
   useEffect(() => {
     fetchAll()
@@ -112,10 +118,10 @@ export function useBuildLog() {
 
     const { error } = await supabase
       .from("build_log")
-      .insert({ author_id: user.id, category, note })
+      .insert({ author_id: user.id, category, note, event_id: eventId ?? null })
 
     if (error) throw error
-  }, [])
+  }, [eventId])
 
   const toggleCheer = useCallback(async (postId: string) => {
     const supabase = createClient()

@@ -9,6 +9,7 @@ export interface BlockerRow {
   category: string
   note: string
   created_at: string
+  event_id?: string | null
   /** Joined from profiles — may be null for seed/community posts */
   author_name?: string | null
   author_avatar?: string | null
@@ -21,7 +22,8 @@ export interface RadarBump {
   seq: number
 }
 
-export function useRadar() {
+/** Pass an event id to scope the feed to one episode; omit/null for the global feed. */
+export function useRadar(eventId?: string | null) {
   const [blockers, setBlockers] = useState<BlockerRow[]>([])
   const [meTooCounts, setMeTooCounts] = useState<Record<string, number>>({})
   const [mineMeToo, setMineMeToo] = useState<Set<string>>(new Set())
@@ -49,7 +51,7 @@ export function useRadar() {
     setUserId(uid)
 
     // Fetch blockers + author profile in one join
-    const { data: blockerData, error: blockerErr } = await supabase
+    let blockerQuery = supabase
       .from("blockers")
       .select(`
         id,
@@ -57,9 +59,12 @@ export function useRadar() {
         category,
         note,
         created_at,
+        event_id,
         profiles:author_id ( name, avatar_url )
       `)
       .order("created_at", { ascending: false })
+    if (eventId) blockerQuery = blockerQuery.eq("event_id", eventId)
+    const { data: blockerData, error: blockerErr } = await blockerQuery
 
     if (blockerErr) {
       console.error("[useRadar] blockers fetch error:", blockerErr)
@@ -91,6 +96,7 @@ export function useRadar() {
       category: b.category,
       note: b.note,
       created_at: b.created_at,
+      event_id: b.event_id ?? null,
       author_name: b.profiles?.name ?? null,
       author_avatar: b.profiles?.avatar_url ?? null,
     }))
@@ -117,7 +123,7 @@ export function useRadar() {
     setMeTooCounts(counts)
     setMineMeToo(mine)
     setLoading(false)
-  }, [])
+  }, [eventId])
 
   // Initial fetch
   useEffect(() => {
@@ -154,7 +160,7 @@ export function useRadar() {
 
     const { data, error } = await supabase
       .from("blockers")
-      .insert({ author_id: user.id, category, note })
+      .insert({ author_id: user.id, category, note, event_id: eventId ?? null })
       .select("id")
       .single()
 
@@ -162,7 +168,7 @@ export function useRadar() {
     // Return the new id so the caller can highlight it reliably (no clock-skew
     // heuristic). Realtime still triggers the refetch that renders it.
     return (data?.id ?? null) as string | null
-  }, [])
+  }, [eventId])
 
   const toggleMeToo = useCallback(async (blockerId: string) => {
     const supabase = createClient()

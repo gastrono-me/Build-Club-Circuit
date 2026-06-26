@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Check, Users as UsersIcon } from "lucide-react"
 import { useEvents, type EventRow } from "@/lib/hooks/useEvents"
 import { eventStatus, PHASE_ORDER, type EventPhase } from "@/lib/events/eventStatus"
@@ -98,8 +99,10 @@ function EventCard({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing[3] }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <PhaseBadge phase={phase} msUntilNext={msUntilNext} />
-          <div
+          <Link
+            href={`/events/${event.slug}`}
             style={{
+              display: "block",
               fontFamily: fonts.display,
               fontWeight: fontWeight.semibold,
               fontSize: fontSize.heading,
@@ -108,7 +111,7 @@ function EventCard({
             }}
           >
             {event.name}
-          </div>
+          </Link>
           {event.tagline && (
             <div style={{ fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted }}>
               {event.tagline}

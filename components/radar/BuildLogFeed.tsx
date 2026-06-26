@@ -7,8 +7,8 @@ import { BuildLogCard } from "@/components/radar/BuildLogCard"
 import { SectionTitle } from "@/components/ui/SectionTitle"
 import { colors, fonts, fontSize, spacing } from "@/lib/design/tokens"
 
-export function BuildLogFeed() {
-  const { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId } = useBuildLog()
+export function BuildLogFeed({ eventId }: { eventId?: string | null } = {}) {
+  const { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId } = useBuildLog(eventId)
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: spacing[6] }}>
