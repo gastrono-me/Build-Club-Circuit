@@ -1,5 +1,5 @@
 /**
- * Spotlight selection — who gets featured on the "Shipped today" rail.
+ * Spotlight selection: who gets featured on the "Shipped today" rail.
  *
  * Inclusive and effort-based, not ranked: every builder who shipped today is
  * eligible exactly once. The order is fair (a deterministic hash keyed on the

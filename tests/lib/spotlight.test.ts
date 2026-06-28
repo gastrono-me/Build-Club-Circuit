@@ -32,7 +32,7 @@ describe("selectSpotlight", () => {
     expect(r.map((p) => p.author_id).sort()).toEqual(["a", "b", "c"])
   })
 
-  it("keeps one entry per author — their latest ship of the day", () => {
+  it("keeps one entry per author, their latest ship of the day", () => {
     const posts = [
       ship("a", "2026-06-28T08:00:00Z", "a-early"),
       ship("a", "2026-06-28T15:00:00Z", "a-late"),

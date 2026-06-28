@@ -72,7 +72,7 @@ describe("selectSpotlight", () => {
     expect(r.map((p) => p.author_id).sort()).toEqual(["a", "b", "c"])
   })
 
-  it("keeps one entry per author — their latest ship of the day", () => {
+  it("keeps one entry per author, their latest ship of the day", () => {
     const posts = [
       ship("a", "2026-06-28T08:00:00Z", "a-early"),
       ship("a", "2026-06-28T15:00:00Z", "a-late"),
@@ -130,7 +130,7 @@ Create `lib/spotlight/rotation.ts`:
 
 ```ts
 /**
- * Spotlight selection — who gets featured on the "Shipped today" rail.
+ * Spotlight selection: who gets featured on the "Shipped today" rail.
  *
  * Inclusive and effort-based, not ranked: every builder who shipped today is
  * eligible exactly once. The order is fair (a deterministic hash keyed on the
@@ -206,12 +206,12 @@ Create `db/migrations/011_spotlight_nominations.sql`:
 
 ```sql
 -- 011 spotlight nominations: a builder can opt a ship of theirs in for an
--- external "spotlight" (e.g. a Build Club feature). Default is OFF — nothing is
+-- external "spotlight" (e.g. a Build Club feature). Default is OFF; nothing is
 -- ever featured externally without this explicit, per-post opt-in.
 --
 -- Curation is manual: an operator reads this queue with the service role and
 -- sets `status`. No automated publishing, no admin UI in this slice. Not added
--- to the realtime publication — it is a queue, not a live feed.
+-- to the realtime publication; it is a queue, not a live feed.
 
 create table if not exists public.spotlight_nominations (
   id         uuid primary key default gen_random_uuid(),
@@ -290,7 +290,7 @@ import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 
 /**
- * The signed-in builder's spotlight nominations — the set of their own post ids
+ * The signed-in builder's spotlight nominations: the set of their own post ids
  * they have opted in for an external feature. Per-post, default off. Optimistic
  * with revert on error. Mirrors the persistence shape of useSubmission. Not
  * realtime: it is a personal opt-in queue, not a shared feed.
