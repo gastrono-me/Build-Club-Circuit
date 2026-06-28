@@ -499,6 +499,7 @@ create policy spotlight_nominations_insert_own on public.spotlight_nominations
   for insert to authenticated
   with check (
     auth.uid() = user_id
+    and status = 'pending'
     and exists (select 1 from public.build_log b where b.id = post_id and b.author_id = auth.uid())
   );
 

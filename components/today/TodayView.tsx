@@ -206,7 +206,10 @@ export function TodayView() {
                 isNominated={nominated.has(p.id)}
                 onToggleNominate={
                   !!userId && p.author_id === userId
-                    ? () => (nominated.has(p.id) ? unnominate(p.id) : nominate(p.id))
+                    ? () =>
+                        (nominated.has(p.id) ? unnominate(p.id) : nominate(p.id)).catch((err) =>
+                          console.error("[spotlight] nominate toggle failed:", err),
+                        )
                     : undefined
                 }
               />
