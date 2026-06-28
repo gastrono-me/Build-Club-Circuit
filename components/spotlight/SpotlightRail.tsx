@@ -40,26 +40,27 @@ export function SpotlightRail({
   onMessage,
 }: SpotlightRailProps) {
   const eligible = useMemo(() => selectSpotlight(posts, now), [posts, now])
+  const visibleCount = Math.min(eligible.length, FACES_VISIBLE)
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const reduceMotion = usePrefersReducedMotion()
 
   // Keep the index in range as the eligible set changes (realtime updates).
   useEffect(() => {
-    if (eligible.length && index >= eligible.length) setIndex(0)
-  }, [eligible.length, index])
+    if (visibleCount && index >= visibleCount) setIndex(0)
+  }, [visibleCount, index])
 
   // Auto-cycle, unless paused, reduced-motion, or nothing to cycle.
   useEffect(() => {
-    if (paused || reduceMotion || eligible.length <= 1) return
-    const t = setInterval(() => setIndex((i) => (i + 1) % eligible.length), CYCLE_MS)
+    if (paused || reduceMotion || visibleCount <= 1) return
+    const t = setInterval(() => setIndex((i) => (i + 1) % visibleCount), CYCLE_MS)
     return () => clearInterval(t)
-  }, [paused, reduceMotion, eligible.length])
+  }, [paused, reduceMotion, visibleCount])
 
   if (eligible.length === 0) return null
 
-  const featured = eligible[Math.min(index, eligible.length - 1)]
   const faces = eligible.slice(0, FACES_VISIBLE)
+  const featured = faces[Math.min(index, faces.length - 1)]
   const overflow = eligible.length - faces.length
   const isOwnFeatured = !!currentUserId && featured.author_id === currentUserId
   const cheered = mineCheers?.has(featured.id) ?? false
@@ -172,7 +173,7 @@ export function SpotlightRail({
         {/* dots / manual navigation */}
         <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginTop: spacing[4], paddingTop: spacing[3], borderTop: `1px solid ${colors.lineSoft}` }}>
           <div style={{ display: "flex", gap: 6 }}>
-            {eligible.map((p, i) => (
+            {faces.map((p, i) => (
               <button
                 key={p.id}
                 type="button"
@@ -182,9 +183,11 @@ export function SpotlightRail({
               />
             ))}
           </div>
-          <span style={{ marginLeft: "auto", fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft }}>
-            spotlight rotates
-          </span>
+          {faces.length > 1 && !reduceMotion && (
+            <span style={{ marginLeft: "auto", fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft }}>
+              spotlight rotates
+            </span>
+          )}
         </div>
       </Card>
     </section>
