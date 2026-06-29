@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { chunk } from "@/lib/util/chunk"
+import { subscribeFeed, notifyFeed, BLOCKERS_TOPIC } from "@/lib/realtime/feedBus"
 
 export interface BlockerRow {
   id: string
@@ -45,9 +46,6 @@ export function useRadar(eventId?: string | null) {
   const prevCountsRef = useRef<Record<string, number>>({})
   const loadedOnceRef = useRef(false)
   const bumpSeqRef = useRef(0)
-  // Unique channel name per hook instance, so two concurrent subscribers
-  // (e.g. the Now-page pulse and the radar page) don't collide on one name.
-  const channelNameRef = useRef(`radar-${Math.random().toString(36).slice(2)}`)
 
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
@@ -138,36 +136,31 @@ export function useRadar(eventId?: string | null) {
     setLoading(false)
   }, [eventId, limit])
 
-  // Keep the realtime handler pointing at the latest fetch without re-subscribing
-  // when the page size changes.
+  // Keep the refetch pointing at the latest fetch (which closes over eventId +
+  // limit) without re-subscribing the broadcast channel when those change.
   const fetchRef = useRef(fetchAll)
   fetchRef.current = fetchAll
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleRefetch = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => fetchRef.current(), REFETCH_DEBOUNCE_MS)
+  }, [])
 
   // Initial fetch
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
 
-  // Realtime subscription (debounced so a burst of me-toos is one refetch)
+  // Live updates over a shared Broadcast topic instead of postgres_changes: a
+  // write pings the topic and every client refetches with its own scoped query.
   useEffect(() => {
-    const supabase = createClient()
-    let timer: ReturnType<typeof setTimeout> | null = null
-    const refetch = () => {
-      if (timer) clearTimeout(timer)
-      timer = setTimeout(() => fetchRef.current(), REFETCH_DEBOUNCE_MS)
-    }
-
-    const channel = supabase
-      .channel(channelNameRef.current)
-      .on("postgres_changes", { event: "*", schema: "public", table: "blockers" }, refetch)
-      .on("postgres_changes", { event: "*", schema: "public", table: "blocker_metoo" }, refetch)
-      .subscribe()
-
+    const off = subscribeFeed(BLOCKERS_TOPIC, scheduleRefetch)
     return () => {
-      if (timer) clearTimeout(timer)
-      supabase.removeChannel(channel)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      off()
     }
-  }, [])
+  }, [scheduleRefetch])
 
   const loadMore = useCallback(() => setLimit((l) => l + RADAR_PAGE), [])
 
@@ -183,10 +176,12 @@ export function useRadar(eventId?: string | null) {
       .single()
 
     if (error) throw error
+    notifyFeed(BLOCKERS_TOPIC)
+    scheduleRefetch()
     // Return the new id so the caller can highlight it reliably (no clock-skew
-    // heuristic). Realtime still triggers the refetch that renders it.
+    // heuristic). The refetch above renders it.
     return (data?.id ?? null) as string | null
-  }, [eventId])
+  }, [eventId, scheduleRefetch])
 
   const toggleMeToo = useCallback(async (blockerId: string) => {
     const supabase = createClient()
@@ -208,8 +203,9 @@ export function useRadar(eventId?: string | null) {
         .insert({ blocker_id: blockerId, user_id: user.id })
       if (error) throw error
     }
-    // Realtime will trigger refetch
-  }, [mineMeToo])
+    notifyFeed(BLOCKERS_TOPIC)
+    scheduleRefetch()
+  }, [mineMeToo, scheduleRefetch])
 
   return { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore }
 }

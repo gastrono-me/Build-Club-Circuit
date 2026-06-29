@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { chunk } from "@/lib/util/chunk"
+import { subscribeFeed, notifyFeed, BUILD_LOG_TOPIC } from "@/lib/realtime/feedBus"
 
 export interface BuildLogRow {
   id: string
@@ -77,8 +78,6 @@ export function useBuildLog(eventId?: string | null) {
   const [userId, setUserId] = useState<string | null>(null)
   const [limit, setLimit] = useState(BUILD_LOG_PAGE)
   const [hasMore, setHasMore] = useState(false)
-  // Unique channel name per hook instance so two concurrent mounts don't collide on one topic.
-  const [channelName] = useState(() => `build-log-${Math.random().toString(36).slice(2)}`)
 
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
@@ -159,34 +158,30 @@ export function useBuildLog(eventId?: string | null) {
     setLoading(false)
   }, [eventId, limit])
 
-  // Keep the realtime handler pointing at the latest fetch without re-subscribing
-  // every time the page size changes.
+  // Keep the refetch pointing at the latest fetch (which closes over eventId +
+  // limit) without re-subscribing the broadcast channel each time those change.
   const fetchRef = useRef(fetchAll)
   fetchRef.current = fetchAll
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleRefetch = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => fetchRef.current(), REFETCH_DEBOUNCE_MS)
+  }, [])
 
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
 
+  // Live updates over a shared Broadcast topic instead of postgres_changes: a
+  // write pings the topic and every client refetches with its own scoped query.
   useEffect(() => {
-    const supabase = createClient()
-    let timer: ReturnType<typeof setTimeout> | null = null
-    const refetch = () => {
-      if (timer) clearTimeout(timer)
-      timer = setTimeout(() => fetchRef.current(), REFETCH_DEBOUNCE_MS)
-    }
-
-    const channel = supabase
-      .channel(channelName)
-      .on("postgres_changes", { event: "*", schema: "public", table: "build_log" }, refetch)
-      .on("postgres_changes", { event: "*", schema: "public", table: "build_log_cheers" }, refetch)
-      .subscribe()
-
+    const off = subscribeFeed(BUILD_LOG_TOPIC, scheduleRefetch)
     return () => {
-      if (timer) clearTimeout(timer)
-      supabase.removeChannel(channel)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      off()
     }
-  }, [channelName])
+  }, [scheduleRefetch])
 
   const loadMore = useCallback(() => setLimit((l) => l + BUILD_LOG_PAGE), [])
 
@@ -200,7 +195,9 @@ export function useBuildLog(eventId?: string | null) {
       .insert({ author_id: user.id, category, note, event_id: eventId ?? null })
 
     if (error) throw error
-  }, [eventId])
+    notifyFeed(BUILD_LOG_TOPIC)
+    scheduleRefetch()
+  }, [eventId, scheduleRefetch])
 
   const toggleCheer = useCallback(async (postId: string) => {
     const supabase = createClient()
@@ -222,7 +219,9 @@ export function useBuildLog(eventId?: string | null) {
         .insert({ post_id: postId, user_id: user.id })
       if (error) throw error
     }
-  }, [mineCheers])
+    notifyFeed(BUILD_LOG_TOPIC)
+    scheduleRefetch()
+  }, [mineCheers, scheduleRefetch])
 
   return {
     posts,
