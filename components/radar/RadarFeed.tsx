@@ -12,7 +12,7 @@ type FeedTab = "stuck" | "shipped"
 
 export function RadarFeed({ eventId }: { eventId?: string | null } = {}) {
   const [tab, setTab] = React.useState<FeedTab>("stuck")
-  const { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump } = useRadar(eventId)
+  const { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore } = useRadar(eventId)
   // Your just-posted blocker (id-stable, set from post()'s returned id).
   const [latestId, setLatestId] = React.useState<string | null>(null)
   // A node that just took a cross-client "me too" (transient pulse).
@@ -240,6 +240,30 @@ export function RadarFeed({ eventId }: { eventId?: string | null } = {}) {
                 onMeToo={() => toggleMeToo(blocker.id)}
               />
             ))}
+          </div>
+        )}
+
+        {!loading && hasMore && (
+          <div style={{ textAlign: "center", marginTop: spacing[4] }}>
+            <button
+              type="button"
+              onClick={loadMore}
+              style={{
+                fontFamily: fonts.mono,
+                fontSize: fontSize.label,
+                fontWeight: fontWeight.semibold,
+                letterSpacing: letterSpacing.label,
+                textTransform: "uppercase",
+                color: colors.ink,
+                background: "transparent",
+                border: `1.5px solid ${colors.ink}`,
+                borderRadius: radii.md,
+                padding: `${spacing[2]}px ${spacing[4]}px`,
+                cursor: "pointer",
+              }}
+            >
+              Load more
+            </button>
           </div>
         )}
       </section>

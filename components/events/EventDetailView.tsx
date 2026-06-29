@@ -32,7 +32,7 @@ export function EventDetailView({ slug }: { slug: string }) {
   const event = useMemo(() => events.find((e) => e.slug === slug) ?? null, [events, slug])
 
   const railEventId = scope === "event" ? (event?.id ?? null) : null
-  const { posts, cheerCounts, mineCheers, toggleCheer, userId } = useBuildLog(railEventId)
+  const { todayPosts, cheerCounts, mineCheers, toggleCheer, userId } = useBuildLog(railEventId)
   const { openPanel } = useSocial()
 
   if (loading || !now) {
@@ -193,7 +193,7 @@ export function EventDetailView({ slug }: { slug: string }) {
 
       {now && (
         <SpotlightRail
-          posts={posts}
+          posts={todayPosts}
           now={now}
           label={scope === "event" ? "Shipped in this event" : "Shipped today"}
           interactive

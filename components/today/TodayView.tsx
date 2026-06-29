@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react"
 import { Flame, Check } from "lucide-react"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { useProfile } from "@/lib/hooks/useProfile"
-import { computeStreak, toDayKey } from "@/lib/streak/streak"
+import { computeStreak } from "@/lib/streak/streak"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
 import { SpotlightRail } from "@/components/spotlight/SpotlightRail"
@@ -21,7 +21,7 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/
  * calendar days.
  */
 export function TodayView() {
-  const { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId } = useBuildLog()
+  const { posts, todayPosts, myPostDates, loading, post, toggleCheer, cheerCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog()
   const { profile } = useProfile()
   const { mine: nominated, nominate, unnominate } = useSpotlightNominations()
   const { openPanel } = useSocial()
@@ -33,16 +33,16 @@ export function TodayView() {
 
   const streak = useMemo(() => {
     if (!now) return null
-    const mine = userId ? posts.filter((p) => p.author_id === userId).map((p) => p.created_at) : []
-    return computeStreak(mine, now)
-  }, [posts, userId, now])
+    // myPostDates is the user's full ship history (not the paginated feed), so the
+    // streak stays correct no matter how little of the feed is loaded.
+    return computeStreak(userId ? myPostDates : [], now)
+  }, [myPostDates, userId, now])
 
   const cohortToday = useMemo(() => {
     if (!now) return { ships: 0, builders: 0 }
-    const key = toDayKey(now)
-    const todays = posts.filter((p) => toDayKey(new Date(p.created_at)) === key)
-    return { ships: todays.length, builders: new Set(todays.map((p) => p.author_id)).size }
-  }, [posts, now])
+    // todayPosts is the full set of today's ships, not just the loaded page.
+    return { ships: todayPosts.length, builders: new Set(todayPosts.map((p) => p.author_id)).size }
+  }, [todayPosts, now])
 
   const greeting = useMemo(() => greetFor(now), [now])
   const firstName = profile?.name?.trim().split(/\s+/)[0]
@@ -121,7 +121,7 @@ export function TodayView() {
       {/* Spotlight: who shipped today */}
       {now && (
         <SpotlightRail
-          posts={posts}
+          posts={todayPosts}
           now={now}
           interactive
           currentUserId={userId}
@@ -216,6 +216,14 @@ export function TodayView() {
             ))}
           </div>
         )}
+
+        {!loading && hasMore && (
+          <div style={{ textAlign: "center", marginTop: spacing[4] }}>
+            <button type="button" onClick={loadMore} style={loadMoreStyle}>
+              Load more
+            </button>
+          </div>
+        )}
       </section>
     </div>
   )
@@ -272,6 +280,20 @@ function StreakRow({ streak }: { streak: ReturnType<typeof computeStreak> | null
       )}
     </div>
   )
+}
+
+const loadMoreStyle: React.CSSProperties = {
+  fontFamily: fonts.mono,
+  fontSize: fontSize.label,
+  fontWeight: fontWeight.semibold,
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
+  color: colors.ink,
+  background: "transparent",
+  border: `1.5px solid ${colors.ink}`,
+  borderRadius: radii.md,
+  padding: `${spacing[2]}px ${spacing[4]}px`,
+  cursor: "pointer",
 }
 
 function greetFor(now: Date | null): string {

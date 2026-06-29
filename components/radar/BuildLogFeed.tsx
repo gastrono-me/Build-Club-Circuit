@@ -5,10 +5,10 @@ import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
 import { SectionTitle } from "@/components/ui/SectionTitle"
-import { colors, fonts, fontSize, spacing } from "@/lib/design/tokens"
+import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/design/tokens"
 
 export function BuildLogFeed({ eventId }: { eventId?: string | null } = {}) {
-  const { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId } = useBuildLog(eventId)
+  const { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId)
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: spacing[6] }}>
@@ -59,6 +59,30 @@ export function BuildLogFeed({ eventId }: { eventId?: string | null } = {}) {
                 onCheer={() => toggleCheer(p.id)}
               />
             ))}
+          </div>
+        )}
+
+        {!loading && hasMore && (
+          <div style={{ textAlign: "center", marginTop: spacing[4] }}>
+            <button
+              type="button"
+              onClick={loadMore}
+              style={{
+                fontFamily: fonts.mono,
+                fontSize: fontSize.label,
+                fontWeight: fontWeight.semibold,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                color: colors.ink,
+                background: "transparent",
+                border: `1.5px solid ${colors.ink}`,
+                borderRadius: radii.md,
+                padding: `${spacing[2]}px ${spacing[4]}px`,
+                cursor: "pointer",
+              }}
+            >
+              Load more
+            </button>
           </div>
         )}
       </section>

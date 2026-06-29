@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { chunk } from "@/lib/util/chunk"
 
 export interface BlockerRow {
   id: string
@@ -22,6 +23,13 @@ export interface RadarBump {
   seq: number
 }
 
+/** How many blockers the feed loads per page. */
+export const RADAR_PAGE = 60
+/** Coalesce bursts of realtime events into a single refetch. */
+const REFETCH_DEBOUNCE_MS = 500
+/** Max ids per `.in(...)` filter, to keep request URLs within limits. */
+const IN_CHUNK = 150
+
 /** Pass an event id to scope the feed to one episode; omit/null for the global feed. */
 export function useRadar(eventId?: string | null) {
   const [blockers, setBlockers] = useState<BlockerRow[]>([])
@@ -29,10 +37,10 @@ export function useRadar(eventId?: string | null) {
   const [mineMeToo, setMineMeToo] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
+  const [limit, setLimit] = useState(RADAR_PAGE)
+  const [hasMore, setHasMore] = useState(false)
   // Cross-client "me too" landed — drives the live pulse + toast on the radar.
   const [bump, setBump] = useState<RadarBump | null>(null)
-  // Keep userId in a ref so realtime callback can access latest value without stale closure
-  const userIdRef = useRef<string | null>(null)
   // Previous me-too counts, to detect which node a realtime change bumped.
   const prevCountsRef = useRef<Record<string, number>>({})
   const loadedOnceRef = useRef(false)
@@ -44,13 +52,11 @@ export function useRadar(eventId?: string | null) {
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
 
-    // Get current user (may be null during initial load)
     const { data: { user } } = await supabase.auth.getUser()
     const uid = user?.id ?? null
-    userIdRef.current = uid
     setUserId(uid)
 
-    // Fetch blockers + author profile in one join
+    // Blockers + author profile, newest-first, bounded by the current page size.
     let blockerQuery = supabase
       .from("blockers")
       .select(`
@@ -63,6 +69,7 @@ export function useRadar(eventId?: string | null) {
         profiles:author_id ( name, avatar_url )
       `)
       .order("created_at", { ascending: false })
+      .limit(limit)
     if (eventId) blockerQuery = blockerQuery.eq("event_id", eventId)
     const { data: blockerData, error: blockerErr } = await blockerQuery
 
@@ -70,26 +77,6 @@ export function useRadar(eventId?: string | null) {
       console.error("[useRadar] blockers fetch error:", blockerErr)
     }
 
-    // Fetch all me-too rows
-    const { data: metooData, error: metooErr } = await supabase
-      .from("blocker_metoo")
-      .select("blocker_id, user_id")
-
-    if (metooErr) {
-      console.error("[useRadar] me-too fetch error:", metooErr)
-    }
-
-    // Build meTooCounts map
-    const counts: Record<string, number> = {}
-    const mine = new Set<string>()
-    for (const row of metooData ?? []) {
-      counts[row.blocker_id] = (counts[row.blocker_id] ?? 0) + 1
-      if (uid && row.user_id === uid) {
-        mine.add(row.blocker_id)
-      }
-    }
-
-    // Normalize blocker rows — profiles join returns object or null
     const normalized: BlockerRow[] = (blockerData ?? []).map((b: any) => ({
       id: b.id,
       author_id: b.author_id,
@@ -101,14 +88,39 @@ export function useRadar(eventId?: string | null) {
       author_avatar: b.profiles?.avatar_url ?? null,
     }))
 
+    // Me-too counts only for the visible blockers, read from the aggregate view
+    // instead of scanning the whole blocker_metoo table in the browser.
+    const visibleIds = normalized.map((b) => b.id)
+    const counts: Record<string, number> = {}
+    const mine = new Set<string>()
+
+    for (const ids of chunk(visibleIds, IN_CHUNK)) {
+      const [countRes, mineRes] = await Promise.all([
+        supabase.from("blocker_metoo_counts").select("blocker_id, metoo").in("blocker_id", ids),
+        uid
+          ? supabase.from("blocker_metoo").select("blocker_id").eq("user_id", uid).in("blocker_id", ids)
+          : Promise.resolve({ data: [], error: null } as any),
+      ])
+      if (countRes.error) console.error("[useRadar] me-too counts fetch error:", countRes.error)
+      if (mineRes.error) console.error("[useRadar] my-me-too fetch error:", mineRes.error)
+      for (const row of (countRes.data ?? []) as { blocker_id: string; metoo: number }[]) {
+        counts[row.blocker_id] = row.metoo
+      }
+      for (const row of (mineRes.data ?? []) as { blocker_id: string }[]) {
+        mine.add(row.blocker_id)
+      }
+    }
+
     // Detect a cross-client me-too rise so the UI can pulse that exact node.
-    // Skip the first load (everything would look "new") and any count that fell.
+    // Only consider blockers that were already visible last fetch — newly loaded
+    // ones (loadMore) or brand-new posts must not register as a "rise".
     if (loadedOnceRef.current) {
       const prev = prevCountsRef.current
       let bumpedId: string | null = null
       let bestDelta = 0
       for (const id in counts) {
-        const delta = counts[id] - (prev[id] ?? 0)
+        if (!(id in prev)) continue
+        const delta = counts[id] - prev[id]
         if (delta > bestDelta) { bestDelta = delta; bumpedId = id }
       }
       if (bumpedId) {
@@ -120,38 +132,44 @@ export function useRadar(eventId?: string | null) {
     loadedOnceRef.current = true
 
     setBlockers(normalized)
+    setHasMore(normalized.length >= limit)
     setMeTooCounts(counts)
     setMineMeToo(mine)
     setLoading(false)
-  }, [eventId])
+  }, [eventId, limit])
+
+  // Keep the realtime handler pointing at the latest fetch without re-subscribing
+  // when the page size changes.
+  const fetchRef = useRef(fetchAll)
+  fetchRef.current = fetchAll
 
   // Initial fetch
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
 
-  // Realtime subscription
+  // Realtime subscription (debounced so a burst of me-toos is one refetch)
   useEffect(() => {
     const supabase = createClient()
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const refetch = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => fetchRef.current(), REFETCH_DEBOUNCE_MS)
+    }
 
     const channel = supabase
       .channel(channelNameRef.current)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "blockers" },
-        () => { fetchAll() }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "blocker_metoo" },
-        () => { fetchAll() }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "blockers" }, refetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "blocker_metoo" }, refetch)
       .subscribe()
 
     return () => {
+      if (timer) clearTimeout(timer)
       supabase.removeChannel(channel)
     }
-  }, [fetchAll])
+  }, [])
+
+  const loadMore = useCallback(() => setLimit((l) => l + RADAR_PAGE), [])
 
   const post = useCallback(async (category: string, note: string) => {
     const supabase = createClient()
@@ -193,5 +211,5 @@ export function useRadar(eventId?: string | null) {
     // Realtime will trigger refetch
   }, [mineMeToo])
 
-  return { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump }
+  return { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore }
 }

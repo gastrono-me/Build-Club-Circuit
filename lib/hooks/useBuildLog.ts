@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { chunk } from "@/lib/util/chunk"
 
 export interface BuildLogRow {
   id: string
@@ -15,14 +16,67 @@ export interface BuildLogRow {
   author_avatar?: string | null
 }
 
-/** Pass an event id to scope the feed to one episode; omit/null for the global feed. */
+/** How many posts the browse feed loads per page. */
+export const BUILD_LOG_PAGE = 50
+/** Coalesce bursts of realtime events into a single refetch. */
+const REFETCH_DEBOUNCE_MS = 500
+/** Max ids per `.in(...)` filter, to keep request URLs within limits. */
+const IN_CHUNK = 150
+
+const POST_SELECT = `
+  id,
+  author_id,
+  category,
+  note,
+  created_at,
+  event_id,
+  profiles:author_id ( name, avatar_url )
+` as const
+
+function normalize(rows: any[] | null): BuildLogRow[] {
+  return (rows ?? []).map((p: any) => ({
+    id: p.id,
+    author_id: p.author_id,
+    category: p.category,
+    note: p.note,
+    created_at: p.created_at,
+    event_id: p.event_id ?? null,
+    author_name: p.profiles?.name ?? null,
+    author_avatar: p.profiles?.avatar_url ?? null,
+  }))
+}
+
+/** Start of the current UTC day, matching toDayKey()'s UTC convention. */
+function startOfUtcDayISO(): string {
+  const n = new Date()
+  return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate())).toISOString()
+}
+
+/**
+ * Pass an event id to scope the feed to one episode; omit/null for the global feed.
+ *
+ * Scale notes (this hook is on the highest-traffic path during a live event):
+ * - The browse feed (`posts`) is paginated with a LIMIT, so payload is bounded
+ *   regardless of how much history accrues. Use `loadMore` to grow it.
+ * - Cheer counts come from the `build_log_cheer_counts` aggregate view, scoped
+ *   to only the posts on screen, instead of pulling the whole cheers table and
+ *   counting in the browser.
+ * - `todayPosts` (the spotlight + "shipped today" set) and `myPostDates` (the
+ *   streak input) are fetched as their own bounded queries so feed pagination
+ *   never truncates them.
+ * - Realtime refetches are debounced so a burst of cheers is one refetch, not
+ *   one per event.
+ */
 export function useBuildLog(eventId?: string | null) {
   const [posts, setPosts] = useState<BuildLogRow[]>([])
+  const [todayPosts, setTodayPosts] = useState<BuildLogRow[]>([])
+  const [myPostDates, setMyPostDates] = useState<string[]>([])
   const [cheerCounts, setCheerCounts] = useState<Record<string, number>>({})
   const [mineCheers, setMineCheers] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
-  const userIdRef = useRef<string | null>(null)
+  const [limit, setLimit] = useState(BUILD_LOG_PAGE)
+  const [hasMore, setHasMore] = useState(false)
   // Unique channel name per hook instance so two concurrent mounts don't collide on one topic.
   const [channelName] = useState(() => `build-log-${Math.random().toString(36).slice(2)}`)
 
@@ -31,61 +85,84 @@ export function useBuildLog(eventId?: string | null) {
 
     const { data: { user } } = await supabase.auth.getUser()
     const uid = user?.id ?? null
-    userIdRef.current = uid
     setUserId(uid)
 
-    let postQuery = supabase
+    // Browse feed: newest-first, bounded by the current page size.
+    let pageQuery = supabase
       .from("build_log")
-      .select(`
-        id,
-        author_id,
-        category,
-        note,
-        created_at,
-        event_id,
-        profiles:author_id ( name, avatar_url )
-      `)
+      .select(POST_SELECT)
       .order("created_at", { ascending: false })
-    if (eventId) postQuery = postQuery.eq("event_id", eventId)
-    const { data: postData, error: postErr } = await postQuery
+      .limit(limit)
+    if (eventId) pageQuery = pageQuery.eq("event_id", eventId)
 
-    if (postErr) {
-      console.error("[useBuildLog] posts fetch error:", postErr)
-    }
+    // Today's ships (spotlight + counter): bounded to one UTC day, not the page.
+    let todayQuery = supabase
+      .from("build_log")
+      .select(POST_SELECT)
+      .gte("created_at", startOfUtcDayISO())
+      .order("created_at", { ascending: false })
+    if (eventId) todayQuery = todayQuery.eq("event_id", eventId)
 
-    const { data: cheerData, error: cheerErr } = await supabase
-      .from("build_log_cheers")
-      .select("post_id, user_id")
+    // The streak only needs the current user's own ship timestamps. Global (a
+    // streak is not event-scoped) and tiny (one user's rows).
+    const myDatesQuery = uid
+      ? supabase
+          .from("build_log")
+          .select("created_at")
+          .eq("author_id", uid)
+          .order("created_at", { ascending: false })
+      : null
 
-    if (cheerErr) {
-      console.error("[useBuildLog] cheers fetch error:", cheerErr)
-    }
+    const [pageRes, todayRes, myDatesRes] = await Promise.all([
+      pageQuery,
+      todayQuery,
+      myDatesQuery ?? Promise.resolve({ data: [], error: null } as any),
+    ])
 
+    if (pageRes.error) console.error("[useBuildLog] posts fetch error:", pageRes.error)
+    if (todayRes.error) console.error("[useBuildLog] today fetch error:", todayRes.error)
+    if (myDatesRes.error) console.error("[useBuildLog] my-dates fetch error:", myDatesRes.error)
+
+    const pagePosts = normalize(pageRes.data)
+    const today = normalize(todayRes.data)
+
+    // Cheer counts only for the posts actually on screen (page + today), read
+    // from the aggregate view so we never scan the whole cheers table. The id
+    // list is chunked so a busy event day can't blow the request URL length.
+    const visibleIds = Array.from(new Set([...pagePosts, ...today].map((p) => p.id)))
     const counts: Record<string, number> = {}
     const mine = new Set<string>()
-    for (const row of cheerData ?? []) {
-      counts[row.post_id] = (counts[row.post_id] ?? 0) + 1
-      if (uid && row.user_id === uid) {
+
+    for (const ids of chunk(visibleIds, IN_CHUNK)) {
+      const [countRes, mineRes] = await Promise.all([
+        supabase.from("build_log_cheer_counts").select("post_id, cheers").in("post_id", ids),
+        uid
+          ? supabase.from("build_log_cheers").select("post_id").eq("user_id", uid).in("post_id", ids)
+          : Promise.resolve({ data: [], error: null } as any),
+      ])
+      if (countRes.error) console.error("[useBuildLog] cheer counts fetch error:", countRes.error)
+      if (mineRes.error) console.error("[useBuildLog] my-cheers fetch error:", mineRes.error)
+      for (const row of (countRes.data ?? []) as { post_id: string; cheers: number }[]) {
+        counts[row.post_id] = row.cheers
+      }
+      for (const row of (mineRes.data ?? []) as { post_id: string }[]) {
         mine.add(row.post_id)
       }
     }
 
-    const normalized: BuildLogRow[] = (postData ?? []).map((p: any) => ({
-      id: p.id,
-      author_id: p.author_id,
-      category: p.category,
-      note: p.note,
-      created_at: p.created_at,
-      event_id: p.event_id ?? null,
-      author_name: p.profiles?.name ?? null,
-      author_avatar: p.profiles?.avatar_url ?? null,
-    }))
-
-    setPosts(normalized)
+    setPosts(pagePosts)
+    setHasMore(pagePosts.length >= limit)
+    setTodayPosts(today)
+    setMyPostDates(((myDatesRes.data ?? []) as { created_at: string }[]).map((r) => r.created_at))
     setCheerCounts(counts)
     setMineCheers(mine)
     setLoading(false)
-  }, [eventId])
+  }, [eventId, limit])
+
+  // Keep the realtime handler pointing at the latest fetch without re-subscribing
+  // every time the page size changes.
+  const fetchRef = useRef(fetchAll)
+  fetchRef.current = fetchAll
 
   useEffect(() => {
     fetchAll()
@@ -93,25 +170,25 @@ export function useBuildLog(eventId?: string | null) {
 
   useEffect(() => {
     const supabase = createClient()
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const refetch = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => fetchRef.current(), REFETCH_DEBOUNCE_MS)
+    }
 
     const channel = supabase
       .channel(channelName)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "build_log" },
-        () => { fetchAll() }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "build_log_cheers" },
-        () => { fetchAll() }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "build_log" }, refetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "build_log_cheers" }, refetch)
       .subscribe()
 
     return () => {
+      if (timer) clearTimeout(timer)
       supabase.removeChannel(channel)
     }
-  }, [fetchAll, channelName])
+  }, [channelName])
+
+  const loadMore = useCallback(() => setLimit((l) => l + BUILD_LOG_PAGE), [])
 
   const post = useCallback(async (category: string, note: string) => {
     const supabase = createClient()
@@ -147,5 +224,17 @@ export function useBuildLog(eventId?: string | null) {
     }
   }, [mineCheers])
 
-  return { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId }
+  return {
+    posts,
+    todayPosts,
+    myPostDates,
+    loading,
+    post,
+    toggleCheer,
+    cheerCounts,
+    mineCheers,
+    userId,
+    loadMore,
+    hasMore,
+  }
 }
