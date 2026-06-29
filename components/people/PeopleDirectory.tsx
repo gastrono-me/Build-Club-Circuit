@@ -1,11 +1,10 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Search, Sparkles, ArrowRight, SlidersHorizontal, ChevronDown, ChevronUp, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useProfile } from "@/lib/hooks/useProfile"
 import { useSocial } from "@/components/shell/SocialProvider"
-import { keywordSearch } from "@/lib/search"
 import { localReason } from "@/lib/ai/local-fallbacks"
 import { matchScore } from "@/lib/match"
 import { Input } from "@/components/ui/Input"
@@ -14,22 +13,56 @@ import { Button } from "@/components/ui/Button"
 import { SectionTitle } from "@/components/ui/SectionTitle"
 import { PersonCard, type NormalizedPerson } from "@/components/people/PersonCard"
 import { PeopleField } from "@/components/people/PeopleField"
-import type { Profile } from "@/types/index"
 import { ALL_TAGS, INDUSTRIES, LOOKING } from "@/types/index"
 import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/design/tokens"
 
 type View = "all" | "connected"
 
+/** Directory page size. The grid grows by this much each "Load more". */
+const PAGE = 24
+/** Candidate pool size for "Find my matches" — bounded so it scales with the roster. */
+const MATCH_POOL = 200
+
+/** Map a raw profiles row to the card/field shape. */
+function normalize(row: any): NormalizedPerson {
+  return {
+    id: row.id,
+    name: row.name ?? "",
+    occupation: row.org
+      ? `${row.occupation ?? ""}${row.occupation && row.org ? " · " : ""}${row.org}`
+      : (row.occupation ?? ""),
+    tags: row.skills ?? [],
+    industries: row.industries ?? [],
+    looking: row.looking ?? [],
+    bio: row.bio ?? "",
+    tagline: row.tagline,
+    links: row.links,
+    avatar: row.avatar_url ?? null,
+    isReal: true,
+  }
+}
+
+/** Strip characters that would break PostgREST's comma/paren `.or()` grammar. */
+function sanitize(q: string): string {
+  return q.replace(/[,()*%]/g, " ").trim()
+}
+
 export function PeopleDirectory() {
   const { profile } = useProfile()
   const { catchups } = useSocial()
-  const connectedIds = new Set(catchups.map(c => c.otherId))
+  const connectedIds = useMemo(() => new Set(catchups.map((c) => c.otherId)), [catchups])
+  const connectedKey = useMemo(() => [...connectedIds].sort().join(","), [connectedIds])
 
-  const [realProfiles, setRealProfiles] = useState<NormalizedPerson[]>([])
   const [signedInId, setSignedInId] = useState<string | null>(null)
-  const [loadingProfiles, setLoadingProfiles] = useState(true)
+  const [authReady, setAuthReady] = useState(false)
+
+  const [people, setPeople] = useState<NormalizedPerson[]>([])
+  const [total, setTotal] = useState(0)
+  const [limit, setLimit] = useState(PAGE)
+  const [loading, setLoading] = useState(true)
 
   const [query, setQuery] = useState("")
+  const [debouncedQuery, setDebouncedQuery] = useState("")
   const [selectedSkills, setSelectedSkills] = useState<string[]>([])
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([])
   const [selectedLooking, setSelectedLooking] = useState<string[]>([])
@@ -38,85 +71,109 @@ export function PeopleDirectory() {
   const [reasons, setReasons] = useState<Record<string, string> | null>(null)
   const [matchedIds, setMatchedIds] = useState<string[]>([])
 
+  // Resolve auth once; the directory query excludes the signed-in user.
   useEffect(() => {
-    async function fetchProfiles() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      setSignedInId(user?.id ?? null)
-
-      const { data } = await supabase.from("profiles").select("*")
-      if (data) {
-        const normalized: NormalizedPerson[] = (data as (Profile & { id: string })[])
-          .map(row => ({
-            id: row.id,
-            name: row.name ?? "",
-            occupation: row.org
-              ? `${row.occupation ?? ""}${row.occupation && row.org ? " · " : ""}${row.org}`
-              : (row.occupation ?? ""),
-            tags: row.skills ?? [],
-            industries: row.industries ?? [],
-            looking: row.looking ?? [],
-            bio: row.bio ?? "",
-            tagline: row.tagline,
-            links: row.links,
-            avatar: row.avatar_url ?? null,
-            isReal: true,
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name))
-        setRealProfiles(normalized)
-      }
-      setLoadingProfiles(false)
-    }
-
-    fetchProfiles()
+    createClient().auth.getUser().then(({ data }) => {
+      setSignedInId(data.user?.id ?? null)
+      setAuthReady(true)
+    })
   }, [])
 
-  // Real users only; the signed-in user's own profile is shown separately, pinned above the directory
-  const allPeople: NormalizedPerson[] = realProfiles.filter(p => p.id !== signedInId)
-  const selfPerson = realProfiles.find(p => p.id === signedInId) ?? null
+  // Debounce the keyword box so we issue one query, not one per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(sanitize(query)), 300)
+    return () => clearTimeout(t)
+  }, [query])
 
-  // Apply keyword search (NormalizedPerson lacks an index signature required by SearchablePerson,
-  // so we cast through unknown on the input and output)
-  const afterKeyword = keywordSearch(
-    allPeople as unknown as Parameters<typeof keywordSearch>[0],
-    query,
-  ) as unknown as NormalizedPerson[]
+  // Any change to the result set resets pagination to the first page.
+  useEffect(() => {
+    setLimit(PAGE)
+  }, [debouncedQuery, selectedSkills, selectedIndustries, selectedLooking, view, connectedKey])
 
-  // Apply chip filters
-  const afterChips = afterKeyword.filter(person => {
-    const skillsOk =
-      selectedSkills.length === 0 ||
-      selectedSkills.some(s => person.tags.includes(s))
-    const industriesOk =
-      selectedIndustries.length === 0 ||
-      selectedIndustries.some(i => person.industries.includes(i))
-    const lookingOk =
-      selectedLooking.length === 0 ||
-      selectedLooking.some(l => person.looking.includes(l))
-    return skillsOk && industriesOk && lookingOk
-  })
+  // Apply the active keyword + chip filters to a profiles query. Search and
+  // filtering run in Postgres so they cover the whole roster, not just the page
+  // already loaded into the browser.
+  const applyFilters = useCallback(
+    (q: any) => {
+      if (debouncedQuery) {
+        q = q.or(
+          [
+            `name.ilike.%${debouncedQuery}%`,
+            `occupation.ilike.%${debouncedQuery}%`,
+            `org.ilike.%${debouncedQuery}%`,
+            `tagline.ilike.%${debouncedQuery}%`,
+            `bio.ilike.%${debouncedQuery}%`,
+          ].join(","),
+        )
+      }
+      if (selectedSkills.length) q = q.overlaps("skills", selectedSkills)
+      if (selectedIndustries.length) q = q.overlaps("industries", selectedIndustries)
+      if (selectedLooking.length) q = q.overlaps("looking", selectedLooking)
+      return q
+    },
+    [debouncedQuery, selectedSkills, selectedIndustries, selectedLooking],
+  )
 
-  // Apply All / Connected view
-  const filtered = view === "connected"
-    ? afterChips.filter(p => connectedIds.has(p.id))
-    : afterChips
+  // Main directory fetch: paginated, newest filters applied server-side.
+  useEffect(() => {
+    if (!authReady) return
+    let cancelled = false
+
+    async function run() {
+      setLoading(true)
+      const supabase = createClient()
+
+      // Connected view is bounded by your own connection count, so fetch those
+      // rows by id rather than paging the whole table.
+      if (view === "connected") {
+        const ids = [...connectedIds]
+        if (ids.length === 0) {
+          if (!cancelled) { setPeople([]); setTotal(0); setLoading(false) }
+          return
+        }
+        let q = supabase.from("profiles").select("*", { count: "exact" }).in("id", ids)
+        if (signedInId) q = q.neq("id", signedInId)
+        const { data, count, error } = await applyFilters(q).order("name").range(0, limit - 1)
+        if (cancelled) return
+        if (error) console.error("[people] connected fetch error:", error)
+        setPeople((data ?? []).map(normalize))
+        setTotal(count ?? 0)
+        setLoading(false)
+        return
+      }
+
+      let q = supabase.from("profiles").select("*", { count: "exact" })
+      if (signedInId) q = q.neq("id", signedInId)
+      const { data, count, error } = await applyFilters(q).order("name").range(0, limit - 1)
+      if (cancelled) return
+      if (error) console.error("[people] directory fetch error:", error)
+      setPeople((data ?? []).map(normalize))
+      setTotal(count ?? 0)
+      setLoading(false)
+    }
+
+    run()
+    return () => { cancelled = true }
+  }, [authReady, signedInId, view, connectedIds, connectedKey, limit, applyFilters])
+
+  // Your own profile — pinned above the directory, built from your profile so it
+  // never depends on the paginated result set.
+  const selfPerson: NormalizedPerson | null = useMemo(() => {
+    if (!signedInId || !profile) return null
+    return normalize({ id: signedInId, ...profile, avatar_url: profile.avatar_url })
+  }, [signedInId, profile])
 
   const activeFilterCount = selectedSkills.length + selectedIndustries.length + selectedLooking.length
+  const hasMore = people.length < total
 
   function toggleSkill(tag: string) {
-    setSelectedSkills(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-    )
+    setSelectedSkills((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
   }
   function toggleIndustry(ind: string) {
-    setSelectedIndustries(prev =>
-      prev.includes(ind) ? prev.filter(i => i !== ind) : [...prev, ind]
-    )
+    setSelectedIndustries((prev) => (prev.includes(ind) ? prev.filter((i) => i !== ind) : [...prev, ind]))
   }
   function toggleLooking(l: string) {
-    setSelectedLooking(prev =>
-      prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l]
-    )
+    setSelectedLooking((prev) => (prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]))
   }
   function clearChipFilters() {
     setSelectedSkills([])
@@ -124,17 +181,31 @@ export function PeopleDirectory() {
     setSelectedLooking([])
   }
 
-  function findMatches() {
+  // Find matches over a bounded candidate pool fetched for the purpose, so the
+  // suggestion quality does not depend on how much of the grid is loaded.
+  async function findMatches() {
     const meForMatch = profile
       ? { tags: profile.skills, industries: profile.industries, looking: profile.looking }
       : { tags: [], industries: [], looking: [] }
-    const ranked = [...filtered]
+
+    const supabase = createClient()
+    let q = supabase.from("profiles").select("*").limit(MATCH_POOL)
+    if (signedInId) q = q.neq("id", signedInId)
+    const { data, error } = await q
+    if (error) {
+      console.error("[people] match pool fetch error:", error)
+      return
+    }
+    const pool = (data ?? []).map(normalize)
+    const ranked = pool
       .sort((a, b) => matchScore(meForMatch, b).score - matchScore(meForMatch, a).score)
       .slice(0, 6)
     const map: Record<string, string> = {}
-    ranked.forEach(p => { map[p.id] = localReason(meForMatch, { tags: p.tags, industries: p.industries, looking: p.looking }) })
+    ranked.forEach((p) => {
+      map[p.id] = localReason(meForMatch, { tags: p.tags, industries: p.industries, looking: p.looking })
+    })
     setReasons(map)
-    setMatchedIds(ranked.map(p => p.id))
+    setMatchedIds(ranked.map((p) => p.id))
   }
 
   function clearSuggestions() {
@@ -142,17 +213,47 @@ export function PeopleDirectory() {
     setMatchedIds([])
   }
 
-  // Suggested-for-you picks stay pinned above the rest of the grid, in ranked order.
+  // Suggested picks, in ranked order, hydrated from the matched ids. They may not
+  // all be in the loaded page, so render them from a lookup that prefers the page
+  // and falls back to nothing if a row is not loaded.
+  const byId = useMemo(() => {
+    const m = new Map<string, NormalizedPerson>()
+    for (const p of people) m.set(p.id, p)
+    return m
+  }, [people])
+  const [matchPool, setMatchPool] = useState<Map<string, NormalizedPerson>>(new Map())
+
+  // Keep a lookup of matched people even when they fall outside the loaded page.
+  useEffect(() => {
+    if (matchedIds.length === 0) return
+    const missing = matchedIds.filter((id) => !byId.has(id) && !matchPool.has(id))
+    if (missing.length === 0) return
+    let cancelled = false
+    createClient()
+      .from("profiles")
+      .select("*")
+      .in("id", missing)
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        setMatchPool((prev) => {
+          const next = new Map(prev)
+          for (const row of data) next.set(row.id, normalize(row))
+          return next
+        })
+      })
+    return () => { cancelled = true }
+  }, [matchedIds, byId, matchPool])
+
   const suggested = matchedIds
-    .map(id => filtered.find(p => p.id === id))
+    .map((id) => byId.get(id) ?? matchPool.get(id))
     .filter((p): p is NormalizedPerson => Boolean(p))
-  const suggestedIds = new Set(suggested.map(p => p.id))
-  const rest = filtered.filter(p => !suggestedIds.has(p.id))
+  const suggestedIds = new Set(suggested.map((p) => p.id))
+  const rest = people.filter((p) => !suggestedIds.has(p.id))
 
   return (
     <div>
       <SectionTitle
-        kicker={`${filtered.length} ${filtered.length === 1 ? "person" : "people"}`}
+        kicker={`${total} ${total === 1 ? "person" : "people"}`}
         title="Find your people"
         note="Browse and filter by skills, industries, and what people are looking for."
       />
@@ -162,7 +263,7 @@ export function PeopleDirectory() {
         <Input
           placeholder="Search by name, role, org, or bio…"
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={(e) => setQuery(e.target.value)}
           icon={<Search size={15} />}
         />
       </div>
@@ -179,7 +280,7 @@ export function PeopleDirectory() {
           marginBottom: spacing[5],
         }}
       >
-        {(["all", "connected"] as View[]).map(v => {
+        {(["all", "connected"] as View[]).map((v) => {
           const active = view === v
           return (
             <button
@@ -206,8 +307,8 @@ export function PeopleDirectory() {
         })}
       </div>
 
-      {/* People field — the room as an embedding field, vectors to your complements */}
-      <PeopleField people={allPeople} me={profile} meId={signedInId} />
+      {/* People field — the loaded slice of the room as an embedding field */}
+      <PeopleField people={people} me={profile} meId={signedInId} />
 
       {/* Who should I meet CTA */}
       <div style={{ background: colors.ink, borderRadius: radii["2xl"], padding: 16, marginBottom: spacing[5], display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
@@ -223,7 +324,7 @@ export function PeopleDirectory() {
         <div style={{ display: "flex", alignItems: "center", gap: spacing[3] }}>
           <button
             type="button"
-            onClick={() => setFiltersOpen(prev => !prev)}
+            onClick={() => setFiltersOpen((prev) => !prev)}
             aria-expanded={filtersOpen}
             style={{
               display: "inline-flex",
@@ -304,12 +405,8 @@ export function PeopleDirectory() {
                 Skills
               </div>
               <div style={{ display: "flex", flexWrap: "wrap" as const, gap: spacing[2] }}>
-                {ALL_TAGS.map(tag => (
-                  <Tag
-                    key={tag}
-                    active={selectedSkills.includes(tag)}
-                    onClick={() => toggleSkill(tag)}
-                  >
+                {ALL_TAGS.map((tag) => (
+                  <Tag key={tag} active={selectedSkills.includes(tag)} onClick={() => toggleSkill(tag)}>
                     {tag}
                   </Tag>
                 ))}
@@ -331,12 +428,8 @@ export function PeopleDirectory() {
                 Industries
               </div>
               <div style={{ display: "flex", flexWrap: "wrap" as const, gap: spacing[2] }}>
-                {INDUSTRIES.map(ind => (
-                  <Tag
-                    key={ind}
-                    active={selectedIndustries.includes(ind)}
-                    onClick={() => toggleIndustry(ind)}
-                  >
+                {INDUSTRIES.map((ind) => (
+                  <Tag key={ind} active={selectedIndustries.includes(ind)} onClick={() => toggleIndustry(ind)}>
                     {ind}
                   </Tag>
                 ))}
@@ -358,12 +451,8 @@ export function PeopleDirectory() {
                 Looking for
               </div>
               <div style={{ display: "flex", flexWrap: "wrap" as const, gap: spacing[2] }}>
-                {LOOKING.map(l => (
-                  <Tag
-                    key={l}
-                    active={selectedLooking.includes(l)}
-                    onClick={() => toggleLooking(l)}
-                  >
+                {LOOKING.map((l) => (
+                  <Tag key={l} active={selectedLooking.includes(l)} onClick={() => toggleLooking(l)}>
                     {l}
                   </Tag>
                 ))}
@@ -374,7 +463,7 @@ export function PeopleDirectory() {
       </div>
 
       {/* Loading state */}
-      {loadingProfiles && (
+      {loading && (
         <div
           style={{
             fontFamily: fonts.mono,
@@ -388,7 +477,7 @@ export function PeopleDirectory() {
       )}
 
       {/* Empty state */}
-      {filtered.length === 0 && !loadingProfiles && (
+      {!loading && people.length === 0 && (
         <div
           style={{
             fontFamily: fonts.body,
@@ -436,7 +525,7 @@ export function PeopleDirectory() {
               gap: spacing[4],
             }}
           >
-            {suggested.map(person => (
+            {suggested.map((person) => (
               <PersonCard key={person.id} person={person} me={profile} reason={reasons?.[person.id]} />
             ))}
           </div>
@@ -458,10 +547,34 @@ export function PeopleDirectory() {
               gap: spacing[4],
             }}
           >
-            {rest.map(person => (
+            {rest.map((person) => (
               <PersonCard key={person.id} person={person} me={profile} reason={reasons?.[person.id]} />
             ))}
           </div>
+
+          {hasMore && (
+            <div style={{ textAlign: "center", marginTop: spacing[5] }}>
+              <button
+                type="button"
+                onClick={() => setLimit((l) => l + PAGE)}
+                style={{
+                  fontFamily: fonts.mono,
+                  fontSize: fontSize.label,
+                  fontWeight: fontWeight.semibold,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                  color: colors.ink,
+                  background: "transparent",
+                  border: `1.5px solid ${colors.ink}`,
+                  borderRadius: radii.md,
+                  padding: `${spacing[2]}px ${spacing[4]}px`,
+                  cursor: "pointer",
+                }}
+              >
+                Load more
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
