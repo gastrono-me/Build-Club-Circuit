@@ -80,7 +80,7 @@ export function SpotlightRail({
           {label}
         </div>
         <div style={{ fontFamily: fonts.mono, fontSize: fontSize.meta, color: colors.go }}>
-          {eligible.length} builders
+          {eligible.length} builder{eligible.length === 1 ? "" : "s"}
         </div>
       </div>
 

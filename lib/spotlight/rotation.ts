@@ -14,8 +14,13 @@
 import { toDayKey } from "@/lib/streak/streak"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
 
-/** Below this many distinct shippers in the window, the rail does not render. */
-export const SPOTLIGHT_MIN_BUILDERS = 3
+/**
+ * Below this many distinct shippers in the window, the rail does not render.
+ * 1 = show as soon as anyone ships (small-cohort and demo friendly). Raise it
+ * (e.g. to 3) once the cohort is large enough that a single shipper should not
+ * carry the rail alone.
+ */
+export const SPOTLIGHT_MIN_BUILDERS = 1
 
 /** djb2 hash over a string (same family as the Avatar fill hash). */
 function hash(s: string): number {

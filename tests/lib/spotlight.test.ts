@@ -9,17 +9,17 @@ function ship(author: string, at: string, id = `${author}-${at}`): BuildLogRow {
 }
 
 describe("selectSpotlight", () => {
-  it("knows the floor is 3", () => {
-    expect(SPOTLIGHT_MIN_BUILDERS).toBe(3)
+  it("knows the floor is 1", () => {
+    expect(SPOTLIGHT_MIN_BUILDERS).toBe(1)
   })
 
   it("returns empty for no posts", () => {
     expect(selectSpotlight([], NOW)).toEqual([])
   })
 
-  it("returns empty below the cold-start floor", () => {
-    const posts = [ship("a", "2026-06-28T09:00:00Z"), ship("b", "2026-06-28T10:00:00Z")]
-    expect(selectSpotlight(posts, NOW)).toEqual([])
+  it("shows a single builder at the floor of 1", () => {
+    const posts = [ship("a", "2026-06-28T09:00:00Z")]
+    expect(selectSpotlight(posts, NOW).map((p) => p.author_id)).toEqual(["a"])
   })
 
   it("returns all distinct shippers at or above the floor", () => {
