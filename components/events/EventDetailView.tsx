@@ -6,9 +6,12 @@ import { ArrowLeft, Check, Users as UsersIcon } from "lucide-react"
 import { useEvents } from "@/lib/hooks/useEvents"
 import { eventStatus, type EventPhase } from "@/lib/events/eventStatus"
 import { RadarFeed } from "@/components/radar/RadarFeed"
+import { SpotlightRail } from "@/components/spotlight/SpotlightRail"
 import { SectionTitle } from "@/components/ui/SectionTitle"
 import { Button } from "@/components/ui/Button"
 import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/design/tokens"
+import { useBuildLog } from "@/lib/hooks/useBuildLog"
+import { useSocial } from "@/components/shell/SocialProvider"
 
 type Scope = "event" | "all"
 
@@ -27,6 +30,10 @@ export function EventDetailView({ slug }: { slug: string }) {
   useEffect(() => { setNow(new Date()) }, [])
 
   const event = useMemo(() => events.find((e) => e.slug === slug) ?? null, [events, slug])
+
+  const railEventId = scope === "event" ? (event?.id ?? null) : null
+  const { posts, cheerCounts, mineCheers, toggleCheer, userId } = useBuildLog(railEventId)
+  const { openPanel } = useSocial()
 
   if (loading || !now) {
     return (
@@ -183,6 +190,25 @@ export function EventDetailView({ slug }: { slug: string }) {
           )
         })}
       </div>
+
+      {now && (
+        <SpotlightRail
+          posts={posts}
+          now={now}
+          label={scope === "event" ? "Shipped in this event" : "Shipped today"}
+          interactive
+          currentUserId={userId}
+          cheerCounts={cheerCounts}
+          mineCheers={mineCheers}
+          onCheer={toggleCheer}
+          onMessage={(p) =>
+            openPanel(
+              { id: p.author_id, name: p.author_name ?? "Builder", avatar: p.author_avatar },
+              "chat",
+            )
+          }
+        />
+      )}
 
       <RadarFeed eventId={scope === "event" ? event.id : null} />
     </div>

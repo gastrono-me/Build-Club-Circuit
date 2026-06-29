@@ -7,6 +7,9 @@ import { useProfile } from "@/lib/hooks/useProfile"
 import { computeStreak, toDayKey } from "@/lib/streak/streak"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
+import { SpotlightRail } from "@/components/spotlight/SpotlightRail"
+import { useSpotlightNominations } from "@/lib/hooks/useSpotlightNominations"
+import { useSocial } from "@/components/shell/SocialProvider"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
 
 /**
@@ -20,6 +23,8 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/
 export function TodayView() {
   const { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId } = useBuildLog()
   const { profile } = useProfile()
+  const { mine: nominated, nominate, unnominate } = useSpotlightNominations()
+  const { openPanel } = useSocial()
 
   // Resolve "now" on the client only, to keep streak math real-time without a
   // server/client hydration mismatch.
@@ -113,6 +118,25 @@ export function TodayView() {
         <PostUpdate onPost={post} />
       </div>
 
+      {/* Spotlight: who shipped today */}
+      {now && (
+        <SpotlightRail
+          posts={posts}
+          now={now}
+          interactive
+          currentUserId={userId}
+          cheerCounts={cheerCounts}
+          mineCheers={mineCheers}
+          onCheer={toggleCheer}
+          onMessage={(p) =>
+            openPanel(
+              { id: p.author_id, name: p.author_name ?? "Builder", avatar: p.author_avatar },
+              "chat",
+            )
+          }
+        />
+      )}
+
       {/* Community feed */}
       <section aria-label="Cohort build log">
         <div
@@ -179,6 +203,15 @@ export function TodayView() {
                 isOwn={!!userId && p.author_id === userId}
                 currentUserId={userId}
                 onCheer={() => toggleCheer(p.id)}
+                isNominated={nominated.has(p.id)}
+                onToggleNominate={
+                  !!userId && p.author_id === userId
+                    ? () =>
+                        (nominated.has(p.id) ? unnominate(p.id) : nominate(p.id)).catch((err) =>
+                          console.error("[spotlight] nominate toggle failed:", err),
+                        )
+                    : undefined
+                }
               />
             ))}
           </div>

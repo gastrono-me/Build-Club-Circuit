@@ -23,6 +23,8 @@ export function useBuildLog(eventId?: string | null) {
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const userIdRef = useRef<string | null>(null)
+  // Unique channel name per hook instance so two concurrent mounts don't collide on one topic.
+  const [channelName] = useState(() => `build-log-${Math.random().toString(36).slice(2)}`)
 
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
@@ -93,7 +95,7 @@ export function useBuildLog(eventId?: string | null) {
     const supabase = createClient()
 
     const channel = supabase
-      .channel("build-log")
+      .channel(channelName)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "build_log" },
@@ -109,7 +111,7 @@ export function useBuildLog(eventId?: string | null) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [fetchAll])
+  }, [fetchAll, channelName])
 
   const post = useCallback(async (category: string, note: string) => {
     const supabase = createClient()

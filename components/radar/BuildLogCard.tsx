@@ -4,7 +4,7 @@ import React from "react"
 import { Card } from "@/components/ui/Card"
 import { Tag } from "@/components/ui/Tag"
 import { Avatar } from "@/components/shell/Avatar"
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, Star } from "lucide-react"
 import { useSocial } from "@/components/shell/SocialProvider"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
@@ -16,6 +16,9 @@ interface BuildLogCardProps {
   isOwn: boolean // current user is the author
   currentUserId: string | null
   onCheer: () => Promise<void>
+  /** Spotlight self-nomination state for the viewer's own post. */
+  isNominated?: boolean
+  onToggleNominate?: () => void
 }
 
 function timeAgo(iso: string): string {
@@ -35,6 +38,8 @@ export function BuildLogCard({
   isOwn,
   currentUserId,
   onCheer,
+  isNominated = false,
+  onToggleNominate,
 }: BuildLogCardProps) {
   const [voting, setVoting] = React.useState(false)
   const { openPanel } = useSocial()
@@ -166,6 +171,30 @@ export function BuildLogCard({
             title={`Message ${authorName}`} aria-label="Message author"
             style={{ display: "inline-flex", alignItems: "center", gap: 5, border: `1.4px solid ${colors.line}`, background: colors.surface, color: colors.ink, borderRadius: radii.md, padding: "6px 10px", fontFamily: fonts.mono, fontSize: fontSize.label, cursor: "pointer" }}>
             <MessageCircle size={13} /> Message
+          </button>
+        )}
+
+        {isOwn && onToggleNominate && (
+          <button
+            type="button"
+            onClick={onToggleNominate}
+            aria-pressed={isNominated}
+            title="Build Club may feature standout ships, with your permission"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              border: `1.4px solid ${isNominated ? colors.violet : colors.line}`,
+              background: isNominated ? colors.violetSoft : colors.surface,
+              color: isNominated ? colors.violet : colors.muted,
+              borderRadius: radii.md,
+              padding: "6px 10px",
+              fontFamily: fonts.mono,
+              fontSize: fontSize.label,
+              cursor: "pointer",
+            }}
+          >
+            <Star size={13} /> {isNominated ? "Submitted for spotlight" : "Submit for a spotlight"}
           </button>
         )}
       </div>
