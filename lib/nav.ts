@@ -38,7 +38,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Your build",
     items: [
-      { label: "Today", href: "/", Icon: Home },
+      { label: "Today", href: "/home", Icon: Home },
       { label: "Radar", href: "/radar", Icon: Activity },
       { label: "Pitch Coach", href: "/pitch", Icon: Mic },
     ],

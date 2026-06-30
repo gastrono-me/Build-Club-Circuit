@@ -6,10 +6,10 @@ import { TopBar } from "@/components/shell/TopBar"
 import { Nav } from "@/components/shell/Nav"
 import { SocialProvider } from "@/components/shell/SocialProvider"
 
-const BARE_PATHS = ["/login", "/auth/callback"]
+const BARE_PATHS = ["/", "/login", "/auth/callback"]
 
 function isBare(pathname: string): boolean {
-  return BARE_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"))
+  return BARE_PATHS.some(p => pathname === p || (p !== "/" && pathname.startsWith(p + "/")))
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {

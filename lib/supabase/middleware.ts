@@ -11,7 +11,10 @@ import { NextResponse, type NextRequest } from 'next/server'
  */
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   const pathname = request.nextUrl.pathname
-  const isPublic = pathname === '/login' || pathname.startsWith('/auth/callback')
+  // The landing ('/') is public to everyone; '/login' redirects to it; the OAuth
+  // callback must stay reachable while signing in.
+  const isPublic =
+    pathname === '/' || pathname === '/login' || pathname.startsWith('/auth/callback')
 
   const hasAuthCookie = request.cookies
     .getAll()
@@ -23,7 +26,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     )
 
   if (!hasAuthCookie && !isPublic) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   return NextResponse.next({ request })

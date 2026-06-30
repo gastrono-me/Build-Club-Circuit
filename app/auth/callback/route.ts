@@ -15,6 +15,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Exchange failed — send to login with an error indicator
-  return NextResponse.redirect(`${origin}/login?error=auth`)
+  // Exchange failed — send back to the landing with an error indicator
+  return NextResponse.redirect(`${origin}/?error=auth`)
 }

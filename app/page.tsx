@@ -1,7 +1,7 @@
-"use client"
+import { Landing } from "@/components/landing/Landing"
 
-import { TodayView } from "@/components/today/TodayView"
-
-export default function Home() {
-  return <TodayView />
+// The bare domain is the public landing page, shown to everyone (signed in or
+// not). The app home moved to /home behind the auth gate.
+export default function Page() {
+  return <Landing />
 }
