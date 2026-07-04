@@ -153,7 +153,7 @@ export interface CatchupAgendaRow {
 
 /**
  * Aggregate catchup list across all pairs for the current user — mirrors useInbox's
- * aggregate-fetch + realtime-refetch shape. Used by ScheduleView and the bell.
+ * aggregate-fetch + realtime-refetch shape. Used by the catchup surfaces and the bell.
  */
 export function useCatchups(): {
   catchups: CatchupAgendaRow[]

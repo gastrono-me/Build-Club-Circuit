@@ -1,10 +1,7 @@
 import {
   Home,
-  Compass,
   Users,
-  Calendar,
   CalendarRange,
-  MessageCircle,
   Activity,
   Mic,
   FolderGit2,
@@ -23,13 +20,9 @@ export interface NavGroup {
 }
 
 /**
- * Circuit's navigation, grouped by the evergreen model rather than one event's
- * two halves:
- *  - "Your build"  — the daily solo loop (the spine).
- *  - "Community"   — the always-on graph: who's building, what's stuck.
- *  - "At an event" — events as first-class episodes (browse/join), plus the
- *                    episode-scoped surfaces (schedule) that light up during a
- *                    live event.
+ * Circuit's navigation, grouped by the evergreen model:
+ *  - "Your build" — the daily loop (the spine): ship, projects, blockers, pitch.
+ *  - "Community"  — the always-on graph plus events as first-class episodes.
  *
  * Everything is always listed (no mode gate) so nothing is hidden.
  */
@@ -47,15 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Community",
     items: [
       { label: "People", href: "/people", Icon: Users },
-      { label: "Discover", href: "/discover", Icon: Compass },
-      { label: "Ask Clawbie", href: "/clawbie", Icon: MessageCircle },
-    ],
-  },
-  {
-    label: "At an event",
-    items: [
       { label: "Events", href: "/events", Icon: CalendarRange },
-      { label: "Schedule", href: "/schedule", Icon: Calendar },
     ],
   },
 ]

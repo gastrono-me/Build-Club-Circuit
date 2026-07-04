@@ -1,5 +1,4 @@
-/** Tags used to categorise hackathon blockers in LINE mode.
- * "hackathon help" and "Other" are required per spec. */
+/** Categories a builder can file a blocker under on the Radar. */
 export const BLOCKER_TAGS = [
   'Auth/Login',
   'Deploy/Infra',
@@ -7,9 +6,9 @@ export const BLOCKER_TAGS = [
   'Agent loops',
   'Rate limits/Cost',
   'UI polish',
-  'Demo prep',
+  'Launch/Demo',
   'Data/Eval',
-  'hackathon help',
+  'Getting unstuck',
   'Other',
 ] as const
 

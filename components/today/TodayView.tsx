@@ -8,6 +8,7 @@ import { computeStreak } from "@/lib/streak/streak"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
 import { SpotlightRail } from "@/components/spotlight/SpotlightRail"
+import { MyProjectsStrip } from "@/components/projects/MyProjectsStrip"
 import { useSpotlightNominations } from "@/lib/hooks/useSpotlightNominations"
 import { useSocial } from "@/components/shell/SocialProvider"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
@@ -117,6 +118,9 @@ export function TodayView() {
         </p>
         <PostUpdate onPost={post} />
       </div>
+
+      {/* What you're building — ships ladder into projects */}
+      {now && <MyProjectsStrip now={now} />}
 
       {/* Spotlight: who shipped today */}
       {now && (

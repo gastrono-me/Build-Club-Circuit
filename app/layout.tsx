@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import { SimClockProvider } from "@/lib/hooks/useSimClock";
 import { AppShell } from "@/components/shell/AppShell";
 
 const fraunces = Fraunces({
@@ -41,11 +40,9 @@ export default function RootLayout({
       className={`${fraunces.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
     >
       <body>
-        <SimClockProvider>
-          <AppShell>
-            {children}
-          </AppShell>
-        </SimClockProvider>
+        <AppShell>
+          {children}
+        </AppShell>
       </body>
     </html>
   );

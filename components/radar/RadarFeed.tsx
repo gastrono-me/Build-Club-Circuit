@@ -35,7 +35,7 @@ export function RadarFeed({ eventId }: { eventId?: string | null } = {}) {
 
   // When a me-too lands from another client, pulse that exact node. If it's on
   // a blocker YOU authored, surface it — you can't me-too your own, so the rise
-  // is necessarily someone else in the room.
+  // is necessarily someone else in the cohort.
   React.useEffect(() => {
     if (!bump) return
     setPulseId(bump.id)
@@ -44,7 +44,7 @@ export function RadarFeed({ eventId }: { eventId?: string | null } = {}) {
 
     const b = blockers.find((x) => x.id === bump.id)
     if (b && userId && b.author_id === userId) {
-      setToast("Someone across the room hit “me too” on your blocker.")
+      setToast("Someone in the cohort hit “me too” on your blocker.")
       if (toastTimer.current) clearTimeout(toastTimer.current)
       toastTimer.current = setTimeout(() => setToast(null), 5_000)
     }
@@ -115,7 +115,7 @@ export function RadarFeed({ eventId }: { eventId?: string | null } = {}) {
             color: colors.ink,
           }}
         >
-          Where the room is{" "}
+          Where the cohort is{" "}
           <em style={{ fontStyle: "italic", color: colors.violet }}>stuck</em>.
         </h1>
         <p

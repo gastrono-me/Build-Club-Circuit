@@ -39,8 +39,8 @@ describe('useEventData', () => {
 })
 
 describe('BLOCKER_TAGS', () => {
-  it('includes "hackathon help"', () => {
-    expect(BLOCKER_TAGS).toContain('hackathon help')
+  it('includes "Getting unstuck"', () => {
+    expect(BLOCKER_TAGS).toContain('Getting unstuck')
   })
 
   it('includes "Other"', () => {

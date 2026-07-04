@@ -100,7 +100,7 @@ describe("layoutField", () => {
     { id: "1", category: "RAG/Retrieval", note: "pinecone retrieval timing out badly" },
     { id: "2", category: "Deploy/Infra", note: "pinecone retrieval keeps timing out" },
     { id: "3", category: "Auth/Login", note: "google oauth redirect loop" },
-    { id: "4", category: "Demo prep", note: "slides not ready for demo day" },
+    { id: "4", category: "Launch/Demo", note: "slides not ready for demo day" },
   ]
 
   it("is deterministic — same input yields identical positions", () => {
