@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { type LucideIcon } from "lucide-react"
 import { colors, fonts, fontSize, fontWeight, spacing, radii, motion, letterSpacing } from "@/lib/design/tokens"
-import { NAV_GROUPS } from "@/lib/nav"
+import { NAV_GROUPS, isActivePath } from "@/lib/nav"
 
 /** Mono section label above a nav group ("PULSE" / "LINE"). Shared with MobileMenu's drawer nav. */
 export function GroupLabel({ children }: { children: React.ReactNode }) {
@@ -63,7 +63,7 @@ export function Nav() {
           <React.Fragment key={group.label}>
             <GroupLabel>{group.label}</GroupLabel>
             {group.items.map(({ label, href, Icon }) => (
-              <NavLink key={href} label={label} href={href} Icon={Icon} active={pathname === href} />
+              <NavLink key={href} label={label} href={href} Icon={Icon} active={isActivePath(pathname, href)} />
             ))}
           </React.Fragment>
         ))}

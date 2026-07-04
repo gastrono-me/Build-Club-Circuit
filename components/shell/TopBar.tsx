@@ -48,7 +48,7 @@ export function TopBar() {
       }}
     >
       {/* Brand */}
-      <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+      <Link href="/home" aria-label="Circuit home" style={{ display: "flex", flexDirection: "column", flexShrink: 0, textDecoration: "none" }}>
         <span
           style={{
             fontFamily: fonts.display,
@@ -70,7 +70,7 @@ export function TopBar() {
         >
           Build Club
         </span>
-      </div>
+      </Link>
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />

@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Menu, X } from "lucide-react"
 import { colors, fonts, fontSize, fontWeight, spacing, radii, shadows, motion } from "@/lib/design/tokens"
-import { NAV_GROUPS, type NavItem } from "@/lib/nav"
+import { NAV_GROUPS, isActivePath, type NavItem } from "@/lib/nav"
 import { GroupLabel } from "@/components/shell/Nav"
 import { Avatar } from "@/components/shell/Avatar"
 import { CatchupRequestRow, MessageRow } from "@/components/shell/NotificationItems"
@@ -179,7 +179,7 @@ export function MobileMenu() {
               <React.Fragment key={group.label}>
                 <GroupLabel>{group.label}</GroupLabel>
                 {group.items.map(item => (
-                  <MobileNavLink key={item.href} item={item} active={pathname === item.href} onClick={() => setOpen(false)} />
+                  <MobileNavLink key={item.href} item={item} active={isActivePath(pathname, item.href)} onClick={() => setOpen(false)} />
                 ))}
               </React.Fragment>
             ))}

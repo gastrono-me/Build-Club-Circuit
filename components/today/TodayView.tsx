@@ -39,11 +39,12 @@ export function TodayView() {
     return computeStreak(userId ? myPostDates : [], now)
   }, [myPostDates, userId, now])
 
-  const cohortToday = useMemo(() => {
-    if (!now) return { ships: 0, builders: 0 }
-    // todayPosts is the full set of today's ships, not just the loaded page.
-    return { ships: todayPosts.length, builders: new Set(todayPosts.map((p) => p.author_id)).size }
-  }, [todayPosts, now])
+  // The feed shows earlier ships only — today's are already featured in the
+  // Spotlight above, so the two sections don't duplicate each other.
+  const earlierPosts = useMemo(() => {
+    const todayIds = new Set(todayPosts.map((p) => p.id))
+    return posts.filter((p) => !todayIds.has(p.id))
+  }, [posts, todayPosts])
 
   const greeting = useMemo(() => greetFor(now), [now])
   const firstName = profile?.name?.trim().split(/\s+/)[0]
@@ -141,34 +142,19 @@ export function TodayView() {
         />
       )}
 
-      {/* Community feed */}
-      <section aria-label="Cohort build log">
+      {/* Community feed — earlier ships (today's live in the Spotlight above) */}
+      <section aria-label="Earlier ships">
         <div
           style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            gap: spacing[2],
+            fontFamily: fonts.mono,
+            fontSize: fontSize.label,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: colors.muted,
             marginBottom: spacing[3],
           }}
         >
-          <div
-            style={{
-              fontFamily: fonts.mono,
-              fontSize: fontSize.label,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: colors.muted,
-            }}
-          >
-            What the cohort is shipping
-          </div>
-          {now && cohortToday.ships > 0 && (
-            <div style={{ fontFamily: fonts.mono, fontSize: fontSize.meta, color: colors.go }}>
-              {cohortToday.ships} shipped today
-              {cohortToday.builders > 1 ? ` · ${cohortToday.builders} builders` : ""}
-            </div>
-          )}
+          Earlier ships
         </div>
 
         {loading ? (
@@ -196,9 +182,21 @@ export function TodayView() {
           >
             No ships yet. Be the first to log one.
           </div>
+        ) : earlierPosts.length === 0 ? (
+          <div
+            style={{
+              fontFamily: fonts.body,
+              fontSize: fontSize.meta,
+              color: colors.mutedSoft,
+              textAlign: "center",
+              padding: `${spacing[6]}px 0`,
+            }}
+          >
+            Just today&rsquo;s ships so far. Earlier ones will show here.
+          </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
-            {posts.map((p) => (
+            {earlierPosts.map((p) => (
               <BuildLogCard
                 key={p.id}
                 post={p}

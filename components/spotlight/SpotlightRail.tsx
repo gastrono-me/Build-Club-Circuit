@@ -44,19 +44,25 @@ export function SpotlightRail({
   const visibleCount = Math.min(eligible.length, FACES_VISIBLE)
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
+  // Once the viewer interacts (tap a face/dot, or touch the rail), stop the
+  // auto-cycle and let them drive — otherwise the card jumps away mid-read,
+  // which hover-pause can't prevent on touch devices.
+  const [pinned, setPinned] = useState(false)
   const reduceMotion = usePrefersReducedMotion()
+
+  const pick = (i: number) => { setIndex(i); setPinned(true) }
 
   // Keep the index in range as the eligible set changes (realtime updates).
   useEffect(() => {
     if (visibleCount && index >= visibleCount) setIndex(0)
   }, [visibleCount, index])
 
-  // Auto-cycle, unless paused, reduced-motion, or nothing to cycle.
+  // Auto-cycle, unless paused, pinned by interaction, reduced-motion, or nothing to cycle.
   useEffect(() => {
-    if (paused || reduceMotion || visibleCount <= 1) return
+    if (paused || pinned || reduceMotion || visibleCount <= 1) return
     const t = setInterval(() => setIndex((i) => (i + 1) % visibleCount), CYCLE_MS)
     return () => clearInterval(t)
-  }, [paused, reduceMotion, visibleCount])
+  }, [paused, pinned, reduceMotion, visibleCount])
 
   if (eligible.length === 0) return null
 
@@ -74,6 +80,7 @@ export function SpotlightRail({
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
+      onTouchStart={() => setPinned(true)}
     >
       {/* header */}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: spacing[2], marginBottom: spacing[3] }}>
@@ -93,7 +100,7 @@ export function SpotlightRail({
             <button
               key={p.id}
               type="button"
-              onClick={() => setIndex(i)}
+              onClick={() => pick(i)}
               aria-label={`Show ${p.author_name ?? "builder"}'s ship`}
               aria-pressed={active}
               style={{
@@ -178,13 +185,13 @@ export function SpotlightRail({
               <button
                 key={p.id}
                 type="button"
-                onClick={() => setIndex(i)}
+                onClick={() => pick(i)}
                 aria-label={`Go to ship ${i + 1}`}
                 style={{ width: i === index ? 18 : 6, height: 6, borderRadius: 999, border: "none", padding: 0, background: i === index ? colors.violet : colors.line, cursor: "pointer", transition: `width ${motion.fast} ${motion.ease}` }}
               />
             ))}
           </div>
-          {faces.length > 1 && !reduceMotion && (
+          {faces.length > 1 && !reduceMotion && !pinned && (
             <span style={{ marginLeft: "auto", fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft }}>
               spotlight rotates
             </span>

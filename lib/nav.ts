@@ -20,6 +20,15 @@ export interface NavGroup {
 }
 
 /**
+ * Whether a nav item should read as active for the current path. Matches the
+ * item exactly and also its sub-routes, so detail pages (e.g. /projects/:id,
+ * /events/:slug) keep their parent tab highlighted.
+ */
+export function isActivePath(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(href + "/")
+}
+
+/**
  * Circuit's navigation, grouped by the evergreen model:
  *  - "Your build" — the daily loop (the spine): ship, projects, blockers, pitch.
  *  - "Community"  — the always-on graph plus events as first-class episodes.

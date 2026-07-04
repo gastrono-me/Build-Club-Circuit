@@ -4,6 +4,7 @@ import React from "react"
 import { usePathname } from "next/navigation"
 import { TopBar } from "@/components/shell/TopBar"
 import { Nav } from "@/components/shell/Nav"
+import { MobileTabBar } from "@/components/shell/MobileTabBar"
 import { SocialProvider } from "@/components/shell/SocialProvider"
 
 const BARE_PATHS = ["/", "/login", "/auth/callback"]
@@ -26,6 +27,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           padding-top: 52px;
           min-height: 100vh;
         }
+        /* Mobile: clear the fixed bottom tab bar (+ safe area) */
+        @media (max-width: 767px) {
+          .vec-main {
+            padding-bottom: calc(56px + env(safe-area-inset-bottom));
+          }
+        }
         /* Desktop: offset left for nav rail */
         @media (min-width: 768px) {
           .vec-main {
@@ -36,6 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <TopBar />
       <Nav />
       <main className="vec-main">{children}</main>
+      <MobileTabBar />
     </SocialProvider>
   )
 }
