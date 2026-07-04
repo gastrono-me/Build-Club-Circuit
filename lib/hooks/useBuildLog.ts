@@ -13,11 +13,24 @@ export interface BuildLogRow {
   created_at: string
   event_id?: string | null
   project_id?: string | null
+  /** Optional attachments the builder added to the ship. */
+  link_url?: string | null
+  media_url?: string | null
+  media_type?: string | null
+  media_name?: string | null
   /** Joined from profiles */
   author_name?: string | null
   author_avatar?: string | null
   /** Joined from projects */
   project_name?: string | null
+}
+
+/** Optional attachments passed to post(). */
+export interface ShipAttachment {
+  linkUrl?: string | null
+  mediaUrl?: string | null
+  mediaType?: string | null
+  mediaName?: string | null
 }
 
 /** How many posts the browse feed loads per page. */
@@ -35,6 +48,10 @@ const POST_SELECT = `
   created_at,
   event_id,
   project_id,
+  link_url,
+  media_url,
+  media_type,
+  media_name,
   profiles:author_id ( name, avatar_url ),
   projects:project_id ( name )
 ` as const
@@ -48,6 +65,10 @@ function normalize(rows: any[] | null): BuildLogRow[] {
     created_at: p.created_at,
     event_id: p.event_id ?? null,
     project_id: p.project_id ?? null,
+    link_url: p.link_url ?? null,
+    media_url: p.media_url ?? null,
+    media_type: p.media_type ?? null,
+    media_name: p.media_name ?? null,
     author_name: p.profiles?.name ?? null,
     author_avatar: p.profiles?.avatar_url ?? null,
     project_name: p.projects?.name ?? null,
@@ -192,14 +213,24 @@ export function useBuildLog(eventId?: string | null) {
 
   const loadMore = useCallback(() => setLimit((l) => l + BUILD_LOG_PAGE), [])
 
-  const post = useCallback(async (category: string, note: string, projectId?: string | null) => {
+  const post = useCallback(async (category: string, note: string, projectId?: string | null, attach?: ShipAttachment) => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("Not authenticated")
 
     const { error } = await supabase
       .from("build_log")
-      .insert({ author_id: user.id, category, note, event_id: eventId ?? null, project_id: projectId ?? null })
+      .insert({
+        author_id: user.id,
+        category,
+        note,
+        event_id: eventId ?? null,
+        project_id: projectId ?? null,
+        link_url: attach?.linkUrl ?? null,
+        media_url: attach?.mediaUrl ?? null,
+        media_type: attach?.mediaType ?? null,
+        media_name: attach?.mediaName ?? null,
+      })
 
     if (error) throw error
     notifyFeed(BUILD_LOG_TOPIC)

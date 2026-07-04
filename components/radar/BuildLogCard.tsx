@@ -7,6 +7,7 @@ import { Tag } from "@/components/ui/Tag"
 import { Avatar } from "@/components/shell/Avatar"
 import { FolderGit2, MessageCircle, Star } from "lucide-react"
 import { useSocial } from "@/components/shell/SocialProvider"
+import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { shipTime } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
@@ -141,6 +142,9 @@ export function BuildLogCard({
       >
         {post.note}
       </p>
+
+      {/* Attachments (image / file / link) */}
+      <ShipAttachments post={post} />
 
       {/* Action row */}
       <div style={{ display: "flex", alignItems: "center", gap: spacing[2] }}>

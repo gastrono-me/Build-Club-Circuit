@@ -11,6 +11,7 @@ import { Tag } from "@/components/ui/Tag"
 import { Avatar } from "@/components/shell/Avatar"
 import { Button } from "@/components/ui/Button"
 import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
+import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { shipDate, shipDayHeading, shipClock, localDayKey } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
 
@@ -34,6 +35,10 @@ interface ShipRow {
   category: string
   note: string
   created_at: string
+  link_url: string | null
+  media_url: string | null
+  media_type: string | null
+  media_name: string | null
   author_name: string | null
   author_avatar: string | null
 }
@@ -74,7 +79,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         .maybeSingle(),
       supabase
         .from("build_log")
-        .select("id, author_id, category, note, created_at, profiles:author_id ( name, avatar_url )")
+        .select("id, author_id, category, note, created_at, link_url, media_url, media_type, media_name, profiles:author_id ( name, avatar_url )")
         .eq("project_id", projectId)
         .order("created_at", { ascending: false })
         .limit(limit),
@@ -106,6 +111,10 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       category: s.category,
       note: s.note,
       created_at: s.created_at,
+      link_url: s.link_url ?? null,
+      media_url: s.media_url ?? null,
+      media_type: s.media_type ?? null,
+      media_name: s.media_name ?? null,
       author_name: s.profiles?.name ?? null,
       author_avatar: s.profiles?.avatar_url ?? null,
     }))
@@ -375,6 +384,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                     <p style={{ margin: 0, fontFamily: fonts.body, fontSize: fontSize.body, color: colors.ink, lineHeight: 1.55 }}>
                       {s.note}
                     </p>
+                    <ShipAttachments post={s} compact />
                   </article>
                 ))}
               </div>

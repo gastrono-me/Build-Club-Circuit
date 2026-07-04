@@ -1,9 +1,12 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useRef, useState } from "react"
+import { Paperclip, Link2, X } from "lucide-react"
 import { BLOCKER_TAGS } from "@/types/index"
 import { Button } from "@/components/ui/Button"
 import { useProjects } from "@/lib/hooks/useProjects"
+import { uploadShipMedia, normalizeLink, type ShipMedia } from "@/lib/storage/shipMedia"
+import type { ShipAttachment } from "@/lib/hooks/useBuildLog"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows, motion } from "@/lib/design/tokens"
 
 /** Sentinel option values for the project select. */
@@ -11,7 +14,7 @@ const NO_PROJECT = ""
 const NEW_PROJECT = "__new__"
 
 interface PostUpdateProps {
-  onPost: (category: string, note: string, projectId?: string | null) => Promise<void>
+  onPost: (category: string, note: string, projectId?: string | null, attach?: ShipAttachment) => Promise<void>
 }
 
 export function PostUpdate({ onPost }: PostUpdateProps) {
@@ -24,6 +27,27 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
   const { mine, create } = useProjects()
   const [projectChoice, setProjectChoice] = useState<string>(NO_PROJECT)
   const [newProjectName, setNewProjectName] = useState("")
+
+  // Optional attachments: a pasted link and/or one uploaded file.
+  const [linkUrl, setLinkUrl] = useState("")
+  const [media, setMedia] = useState<ShipMedia | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = "" // allow re-selecting the same file later
+    if (!file) return
+    setUploading(true)
+    setError(null)
+    try {
+      setMedia(await uploadShipMedia(file))
+    } catch (err: any) {
+      setError(err?.message ?? "Upload failed")
+    } finally {
+      setUploading(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -42,14 +66,23 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
         setProjectChoice(created.id)
         setNewProjectName("")
       }
-      await onPost(category, note.trim(), projectId)
+      await onPost(category, note.trim(), projectId, {
+        linkUrl: normalizeLink(linkUrl),
+        mediaUrl: media?.url ?? null,
+        mediaType: media?.type ?? null,
+        mediaName: media?.name ?? null,
+      })
       setNote("")
+      setLinkUrl("")
+      setMedia(null)
     } catch (err: any) {
       setError(err?.message ?? "Something went wrong")
     } finally {
       setSubmitting(false)
     }
   }
+
+  const isImage = media?.type.startsWith("image/") ?? false
 
   return (
     <form
@@ -249,6 +282,94 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
         </div>
       </div>
 
+      {/* Optional attachments: a link + one file */}
+      <div style={{ display: "flex", flexDirection: "column", gap: spacing[2] }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: spacing[2],
+            border: `1px solid ${colors.line}`,
+            borderRadius: radii.md,
+            padding: "0 10px",
+          }}
+        >
+          <Link2 size={15} color={colors.mutedSoft} style={{ flexShrink: 0 }} />
+          <input
+            type="url"
+            inputMode="url"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            placeholder="Add a link (demo, repo, tweet)…"
+            style={{
+              flex: 1,
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              color: colors.ink,
+              fontFamily: fonts.body,
+              fontSize: fontSize.body,
+              padding: "10px 0",
+            }}
+          />
+        </div>
+
+        <input ref={fileRef} type="file" onChange={handleFile} style={{ display: "none" }} />
+
+        {media ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: spacing[2],
+              border: `1px solid ${colors.line}`,
+              borderRadius: radii.md,
+              padding: spacing[2],
+            }}
+          >
+            {isImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={media.url} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: radii.sm, flexShrink: 0 }} />
+            ) : (
+              <Paperclip size={16} color={colors.violet} style={{ flexShrink: 0 }} />
+            )}
+            <span style={{ flex: 1, minWidth: 0, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {media.name}
+            </span>
+            <button
+              type="button"
+              onClick={() => setMedia(null)}
+              aria-label="Remove attachment"
+              style={{ border: "none", background: "transparent", color: colors.muted, cursor: "pointer", display: "flex", flexShrink: 0 }}
+            >
+              <X size={15} />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              alignSelf: "flex-start",
+              border: `1.4px solid ${colors.line}`,
+              background: colors.surface,
+              color: colors.muted,
+              borderRadius: radii.md,
+              padding: "6px 11px",
+              fontFamily: fonts.mono,
+              fontSize: fontSize.label,
+              cursor: uploading ? "wait" : "pointer",
+            }}
+          >
+            <Paperclip size={13} /> {uploading ? "Uploading…" : "Add a photo or file"}
+          </button>
+        )}
+      </div>
+
       {error && (
         <p style={{ margin: 0, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.live }}>
           {error}
@@ -258,7 +379,7 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
       <Button
         type="submit"
         variant="accent"
-        disabled={submitting || !note.trim()}
+        disabled={submitting || uploading || !note.trim()}
         full
       >
         {submitting ? "Posting…" : "Post update"}

@@ -6,6 +6,7 @@ import { Avatar } from "@/components/shell/Avatar"
 import { Card } from "@/components/ui/Card"
 import { Tag } from "@/components/ui/Tag"
 import { selectSpotlight } from "@/lib/spotlight/rotation"
+import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { shipTime } from "@/lib/time"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
@@ -149,6 +150,8 @@ export function SpotlightRail({
         <p style={{ margin: 0, fontFamily: fonts.body, fontSize: fontSize.body, color: colors.ink, lineHeight: 1.6 }}>
           {featured.note}
         </p>
+
+        <ShipAttachments post={featured} compact />
 
         {interactive && (
           <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginTop: spacing[4] }}>
