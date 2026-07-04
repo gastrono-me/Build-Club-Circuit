@@ -43,11 +43,43 @@ if (!url) {
 
 // Supabase requires SSL; skip verification for the local case only.
 const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url)
-const client = new pg.Client({ connectionString: url, ssl: isLocal ? false : { rejectUnauthorized: false } })
+const ssl = isLocal ? false : { rejectUnauthorized: false }
+
+/**
+ * Connect with a few retries. Supabase's connection pooler occasionally rejects
+ * or drops the first attempt (transient "password authentication failed" /
+ * timeouts) even with correct credentials, so one blip should not fail a deploy.
+ * A genuinely wrong credential still fails every attempt and surfaces the error.
+ */
+async function connect(attempts = 4) {
+  let lastErr
+  for (let i = 1; i <= attempts; i++) {
+    const c = new pg.Client({ connectionString: url, ssl, connectionTimeoutMillis: 15000 })
+    try {
+      await c.connect()
+      return c
+    } catch (err) {
+      lastErr = err
+      await c.end().catch(() => {})
+      if (i < attempts) {
+        console.error(`connect attempt ${i}/${attempts} failed (${err.message}); retrying…`)
+        await new Promise((r) => setTimeout(r, 1500 * i))
+      }
+    }
+  }
+  throw lastErr
+}
 
 async function main() {
-  await client.connect()
+  const client = await connect()
+  try {
+    await run(client)
+  } finally {
+    await client.end().catch(() => {})
+  }
+}
 
+async function run(client) {
   await client.query(`
     create table if not exists public._migrations (
       name       text primary key,
@@ -114,9 +146,7 @@ async function main() {
   console.log("Done.")
 }
 
-main()
-  .catch((err) => {
-    console.error("\nMigration failed:", err.message)
-    process.exitCode = 1
-  })
-  .finally(() => client.end())
+main().catch((err) => {
+  console.error("\nMigration failed:", err.message)
+  process.exitCode = 1
+})
