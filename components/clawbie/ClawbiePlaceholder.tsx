@@ -48,8 +48,7 @@ export function ClawbiePlaceholder() {
           }}
         >
           The assistant is being integrated by the event organiser and will be available
-          before the event opens. Until then, use the Schedule and Maps pages for session
-          and venue information.
+          before the event opens. Until then, use the Schedule page for session information.
         </p>
         <div
           style={{

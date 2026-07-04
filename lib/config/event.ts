@@ -10,14 +10,10 @@
  * People's industries) without caring what AABW's blocker categories are.
  */
 
-import { hm } from "@/lib/time"
 import type { BlockerTag } from "@/lib/data/blocker-tags"
 import type { Point } from "@/lib/radar/similarity"
 
 export type CategoryColorKey = "ink" | "violet" | "oxblood" | "muted"
-
-/** When the Demo Day submission window closes (sim-clock day + minutes-since-midnight). */
-export const DEMO_DAY_DEADLINE = { day: 4, mins: hm(9, 30) }
 
 /** Bottleneck Radar plot axis labels — describe this event's category spread. */
 export const RADAR_AXIS_LABELS = { topLeft: "tooling → model", bottomRight: "retrieval → shipping" }
@@ -39,17 +35,3 @@ export const BLOCKER_CATEGORIES: Record<BlockerTag, { color: CategoryColorKey; a
   "Data/Eval":        { color: "ink",    anchor: { x: 0.3, y: 0.55 } },
   Other:              { color: "muted",  anchor: { x: 0.5, y: 0.45 } },
 }
-
-/** DevPost submission checklist, in display order. */
-export const CHECKLIST_ITEMS: { id: string; label: string }[] = [
-  { id: "project-name",    label: "Project name" },
-  { id: "tagline",         label: "Tagline / one-line pitch" },
-  { id: "project-details", label: "Project details (what it does + how built)" },
-  { id: "story",           label: "Story (inspiration / what you learned)" },
-  { id: "built-with",      label: "Built-with tech tags" },
-  { id: "screenshots",     label: "Screenshots / images" },
-  { id: "demo-video",      label: "Demo video link" },
-  { id: "try-it-url",      label: '"Try it" deployed URL' },
-  { id: "github-repo",     label: "GitHub repo link" },
-  { id: "devpost-submit",  label: "Submitted on DevPost" },
-]

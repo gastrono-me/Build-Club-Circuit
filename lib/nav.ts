@@ -2,11 +2,9 @@ import {
   Home,
   Compass,
   Users,
-  Map,
   Calendar,
   CalendarRange,
   MessageCircle,
-  Clock,
   Activity,
   Mic,
   FolderGit2,
@@ -30,8 +28,8 @@ export interface NavGroup {
  *  - "Your build"  — the daily solo loop (the spine).
  *  - "Community"   — the always-on graph: who's building, what's stuck.
  *  - "At an event" — events as first-class episodes (browse/join), plus the
- *                    episode-scoped surfaces (schedule/maps/deadline) that light
- *                    up during a live event.
+ *                    episode-scoped surfaces (schedule) that light up during a
+ *                    live event.
  *
  * Everything is always listed (no mode gate) so nothing is hidden.
  */
@@ -58,8 +56,6 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Events", href: "/events", Icon: CalendarRange },
       { label: "Schedule", href: "/schedule", Icon: Calendar },
-      { label: "Maps", href: "/maps", Icon: Map },
-      { label: "Deadline", href: "/deadline", Icon: Clock },
     ],
   },
 ]

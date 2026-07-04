@@ -192,7 +192,7 @@ export function Landing() {
               icon={<CalendarClock size={18} />}
               kicker="Lights up at events"
               title="Your toolkit during the intensity"
-              body="When you are at a live build week, Circuit becomes the room's instrument: the schedule, the deadline checklist, and a live radar of where everyone is stuck. Episodes on a continuous arc."
+              body="When you are at a live build week, Circuit becomes the room's instrument: the schedule and a live radar of where everyone is stuck. Episodes on a continuous arc."
               visual={<EventVisual />}
             />
           </div>
