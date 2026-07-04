@@ -10,6 +10,7 @@ import { SectionTitle } from "@/components/ui/SectionTitle"
 import { Tag } from "@/components/ui/Tag"
 import { Avatar } from "@/components/shell/Avatar"
 import { Button } from "@/components/ui/Button"
+import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
 import { shipDate, shipDayHeading, shipClock, localDayKey } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
 
@@ -20,6 +21,8 @@ interface ProjectMeta {
   owner_id: string
   name: string
   tagline: string | null
+  industries: string[]
+  tags: string[]
   created_at: string
   owner_name: string | null
   owner_avatar: string | null
@@ -51,6 +54,12 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [userId, setUserId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  // Owner label editing
+  const [editing, setEditing] = useState(false)
+  const [editIndustries, setEditIndustries] = useState<string[]>([])
+  const [editTags, setEditTags] = useState<string[]>([])
+  const [savingLabels, setSavingLabels] = useState(false)
+
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
 
@@ -60,7 +69,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     const [projRes, shipRes] = await Promise.all([
       supabase
         .from("projects")
-        .select("id, owner_id, name, tagline, created_at, profiles:owner_id ( name, avatar_url )")
+        .select("id, owner_id, name, tagline, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
         .eq("id", projectId)
         .maybeSingle(),
       supabase
@@ -85,6 +94,8 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       owner_id: p.owner_id,
       name: p.name,
       tagline: p.tagline ?? null,
+      industries: p.industries ?? [],
+      tags: p.tags ?? [],
       created_at: p.created_at,
       owner_name: p.profiles?.name ?? null,
       owner_avatar: p.profiles?.avatar_url ?? null,
@@ -123,6 +134,36 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     }
     return [...map.entries()]
   }, [ships])
+
+  function startEdit() {
+    if (!project) return
+    setEditIndustries(project.industries)
+    setEditTags(project.tags)
+    setEditing(true)
+  }
+
+  function toggleEditLabel(group: "industries" | "tags", value: string) {
+    const [get, set] = group === "industries" ? [editIndustries, setEditIndustries] as const : [editTags, setEditTags] as const
+    set(get.includes(value) ? get.filter((v) => v !== value) : [...get, value])
+  }
+
+  async function saveLabels() {
+    if (!project) return
+    setSavingLabels(true)
+    try {
+      const { error } = await createClient()
+        .from("projects")
+        .update({ industries: editIndustries, tags: editTags })
+        .eq("id", project.id)
+      if (error) throw error
+      setProject({ ...project, industries: editIndustries, tags: editTags })
+      setEditing(false)
+    } catch (err) {
+      console.error("[project] label save failed:", err)
+    } finally {
+      setSavingLabels(false)
+    }
+  }
 
   async function handleDelete() {
     if (!project) return
@@ -232,6 +273,43 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           <span>started {shipDate(project.created_at, now)}</span>
           <span style={{ color: colors.go }}>{ships.length}{hasMore ? "+" : ""} ship{ships.length === 1 ? "" : "s"}</span>
         </div>
+
+        {/* Labels */}
+        {editing ? (
+          <div style={{ marginTop: spacing[4], border: `1px solid ${colors.line}`, borderRadius: radii.lg, padding: spacing[4] }}>
+            <ProjectLabelPicker industries={editIndustries} tags={editTags} onToggle={toggleEditLabel} />
+            <div style={{ display: "flex", gap: spacing[2], marginTop: spacing[4] }}>
+              <Button variant="accent" size="sm" disabled={savingLabels} onClick={saveLabels}>
+                {savingLabels ? "Saving…" : "Save labels"}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          (project.industries.length > 0 || project.tags.length > 0 || isOwner) && (
+            <div style={{ display: "flex", alignItems: "center", gap: spacing[3], flexWrap: "wrap", marginTop: spacing[4] }}>
+              <ProjectLabelChips industries={project.industries} tags={project.tags} />
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={startEdit}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: colors.violet,
+                    fontFamily: fonts.mono,
+                    fontSize: fontSize.label,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {project.industries.length || project.tags.length ? "Edit labels" : "+ Add labels"}
+                </button>
+              )}
+            </div>
+          )
+        )}
       </header>
 
       {/* Timeline */}

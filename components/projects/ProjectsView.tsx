@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import { Card } from "@/components/ui/Card"
 import { Avatar } from "@/components/shell/Avatar"
+import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
 import { shipDate, shipTime } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/design/tokens"
 
@@ -18,10 +19,25 @@ export function ProjectsView() {
   const [formOpen, setFormOpen] = useState(false)
   const [name, setName] = useState("")
   const [tagline, setTagline] = useState("")
+  const [industries, setIndustries] = useState<string[]>([])
+  const [tags, setTags] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const others = projects.filter((p) => p.owner_id !== userId)
+
+  function toggleLabel(group: "industries" | "tags", value: string) {
+    const [get, set] = group === "industries" ? [industries, setIndustries] as const : [tags, setTags] as const
+    set(get.includes(value) ? get.filter((v) => v !== value) : [...get, value])
+  }
+
+  function resetForm() {
+    setName("")
+    setTagline("")
+    setIndustries([])
+    setTags([])
+    setError(null)
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -29,9 +45,8 @@ export function ProjectsView() {
     setBusy(true)
     setError(null)
     try {
-      await create(name, tagline)
-      setName("")
-      setTagline("")
+      await create(name, tagline, { industries, tags })
+      resetForm()
       setFormOpen(false)
     } catch (err: any) {
       setError(err?.message ?? "Something went wrong")
@@ -55,6 +70,7 @@ export function ProjectsView() {
             <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
               <Input label="Project name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Circuit mobile app" autoFocus required />
               <Input label="Tagline (optional)" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="One line on what it is" />
+              <ProjectLabelPicker industries={industries} tags={tags} onToggle={toggleLabel} />
               {error && (
                 <p style={{ margin: 0, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.live }}>{error}</p>
               )}
@@ -62,7 +78,7 @@ export function ProjectsView() {
                 <Button type="submit" variant="accent" disabled={busy || !name.trim()}>
                   {busy ? "Creating…" : "Create project"}
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => setFormOpen(false)}>Cancel</Button>
+                <Button type="button" variant="ghost" onClick={() => { resetForm(); setFormOpen(false) }}>Cancel</Button>
               </div>
             </form>
           </Card>
@@ -144,6 +160,11 @@ function ProjectCard({ project, now }: { project: ProjectRow; now: Date }) {
           <p style={{ margin: `0 0 ${spacing[3]}px`, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted, lineHeight: 1.45 }}>
             {project.tagline}
           </p>
+        )}
+        {(project.industries.length > 0 || project.tags.length > 0) && (
+          <div style={{ marginBottom: spacing[3] }}>
+            <ProjectLabelChips industries={project.industries} tags={project.tags} max={4} />
+          </div>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: spacing[2], flexWrap: "wrap" }}>
           <span

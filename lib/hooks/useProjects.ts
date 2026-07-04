@@ -8,6 +8,8 @@ export interface ProjectRow {
   owner_id: string
   name: string
   tagline: string | null
+  industries: string[]
+  tags: string[]
   created_at: string
   /** Joined from profiles */
   owner_name?: string | null
@@ -15,6 +17,12 @@ export interface ProjectRow {
   /** From the project_ship_counts view; 0 / null when the project has no ships. */
   ships: number
   last_ship: string | null
+}
+
+/** The label fields a builder can set on their project. */
+export interface ProjectLabels {
+  industries?: string[]
+  tags?: string[]
 }
 
 /**
@@ -37,7 +45,7 @@ export function useProjects() {
     const [projRes, countRes] = await Promise.all([
       supabase
         .from("projects")
-        .select("id, owner_id, name, tagline, created_at, profiles:owner_id ( name, avatar_url )")
+        .select("id, owner_id, name, tagline, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
         .order("created_at", { ascending: false }),
       supabase.from("project_ship_counts").select("project_id, ships, last_ship"),
     ])
@@ -56,6 +64,8 @@ export function useProjects() {
         owner_id: p.owner_id,
         name: p.name,
         tagline: p.tagline ?? null,
+        industries: p.industries ?? [],
+        tags: p.tags ?? [],
         created_at: p.created_at,
         owner_name: p.profiles?.name ?? null,
         owner_avatar: p.profiles?.avatar_url ?? null,
@@ -70,21 +80,46 @@ export function useProjects() {
     fetchAll()
   }, [fetchAll])
 
-  const create = useCallback(async (name: string, tagline?: string): Promise<ProjectRow> => {
+  const create = useCallback(async (name: string, tagline?: string, labels?: ProjectLabels): Promise<ProjectRow> => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("Not authenticated")
 
     const { data, error } = await supabase
       .from("projects")
-      .insert({ owner_id: user.id, name: name.trim(), tagline: tagline?.trim() || null })
-      .select("id, owner_id, name, tagline, created_at")
+      .insert({
+        owner_id: user.id,
+        name: name.trim(),
+        tagline: tagline?.trim() || null,
+        industries: labels?.industries ?? [],
+        tags: labels?.tags ?? [],
+      })
+      .select("id, owner_id, name, tagline, industries, tags, created_at")
       .single()
     if (error) throw error
 
     const row: ProjectRow = { ...(data as any), owner_name: null, owner_avatar: null, ships: 0, last_ship: null }
     setProjects((prev) => [row, ...prev])
     return row
+  }, [])
+
+  const update = useCallback(async (projectId: string, patch: ProjectLabels): Promise<void> => {
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        ...(patch.industries !== undefined ? { industries: patch.industries } : {}),
+        ...(patch.tags !== undefined ? { tags: patch.tags } : {}),
+      })
+      .eq("id", projectId)
+    if (error) throw error
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? { ...p, industries: patch.industries ?? p.industries, tags: patch.tags ?? p.tags }
+          : p,
+      ),
+    )
   }, [])
 
   const remove = useCallback(async (projectId: string) => {
@@ -96,5 +131,5 @@ export function useProjects() {
 
   const mine = userId ? projects.filter((p) => p.owner_id === userId) : []
 
-  return { projects, mine, loading, userId, create, remove, refetch: fetchAll }
+  return { projects, mine, loading, userId, create, update, remove, refetch: fetchAll }
 }
