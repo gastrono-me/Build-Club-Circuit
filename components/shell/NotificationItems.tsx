@@ -5,7 +5,7 @@ import { CalendarDays } from "lucide-react"
 import { Avatar } from "@/components/shell/Avatar"
 import type { CatchupAgendaRow } from "@/lib/hooks/useCatchups"
 import type { InboxConversation } from "@/components/shell/SocialProvider"
-import { fmt } from "@/lib/time"
+import { catchupWhen } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, spacing, radii } from "@/lib/design/tokens"
 
 /** <60s "now", <60m "Nm", <24h "Nh", else "Nd" */
@@ -71,7 +71,7 @@ export function CatchupRequestRow({
           {catchup.otherName ?? "Builder"} wants to catch up
         </span>
         <span style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.violet }}>
-          {fmt(catchup.start_min)}–{fmt(catchup.end_min)}
+          {catchupWhen(catchup.starts_at, catchup.ends_at, new Date())}
         </span>
       </div>
     </button>

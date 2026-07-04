@@ -9,15 +9,18 @@ export interface CatchupRow {
   id: string
   proposer_id: string
   recipient_id: string
-  day: number
-  start_min: number
-  end_min: number
+  /** Real calendar timestamps. Null only on legacy pre-calendar rows. */
+  starts_at: string | null
+  ends_at: string | null
   status: CatchupStatus
   created_at: string
   updated_at: string
 }
 
-const CATCHUP_COLUMNS = "id, proposer_id, recipient_id, day, start_min, end_min, status, created_at, updated_at"
+/** Default catchup length. */
+export const CATCHUP_MINUTES = 15
+
+const CATCHUP_COLUMNS = "id, proposer_id, recipient_id, starts_at, ends_at, status, created_at, updated_at"
 
 /**
  * Per-pair catchup state — shaped like useDirectMessages. A propose/accept/decline/cancel
@@ -25,7 +28,7 @@ const CATCHUP_COLUMNS = "id, proposer_id, recipient_id, day, start_min, end_min,
  */
 export function useCatchup(otherUserId: string | null): {
   catchup: CatchupRow | null
-  propose: (day: number, startMin: number) => Promise<void>
+  propose: (startsAtISO: string) => Promise<void>
   accept: () => Promise<void>
   decline: () => Promise<void>
   cancel: () => Promise<void>
@@ -90,14 +93,15 @@ export function useCatchup(otherUserId: string | null): {
     return () => { supabase.removeChannel(channel) }
   }, [userId, otherUserId, fetchLatest])
 
-  const propose = useCallback(async (day: number, startMin: number) => {
+  const propose = useCallback(async (startsAtISO: string) => {
     const me = userIdRef.current
     if (!me || !otherUserId) return
     if (catchup && (catchup.status === "proposed" || catchup.status === "accepted")) return
+    const endsAtISO = new Date(new Date(startsAtISO).getTime() + CATCHUP_MINUTES * 60_000).toISOString()
     const supabase = createClient()
     const { data, error } = await supabase
       .from("catchups")
-      .insert({ proposer_id: me, recipient_id: otherUserId, day, start_min: startMin, end_min: startMin + 15, status: "proposed" })
+      .insert({ proposer_id: me, recipient_id: otherUserId, starts_at: startsAtISO, ends_at: endsAtISO, status: "proposed" })
       .select(CATCHUP_COLUMNS)
       .single()
     if (error) { console.error("[useCatchup] propose error:", error); return }
@@ -143,9 +147,8 @@ export interface CatchupAgendaRow {
   otherId: string
   otherName: string | null
   otherAvatar: string | null
-  day: number
-  start_min: number
-  end_min: number
+  starts_at: string | null
+  ends_at: string | null
   status: CatchupStatus
   /** "sent" = I proposed it; "received" = the other person proposed it. */
   direction: "sent" | "received"
@@ -201,9 +204,8 @@ export function useCatchups(): {
         otherId,
         otherName: profile?.name ?? null,
         otherAvatar: profile?.avatar_url ?? null,
-        day: r.day,
-        start_min: r.start_min,
-        end_min: r.end_min,
+        starts_at: r.starts_at,
+        ends_at: r.ends_at,
         status: r.status,
         direction: r.proposer_id === me ? "sent" : "received",
       }

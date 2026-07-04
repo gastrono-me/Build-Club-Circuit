@@ -55,3 +55,20 @@ export const localDayKey = (iso: string): string => {
   const d = new Date(iso)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+/** Minutes-since-midnight for a timestamp, in local time. */
+const localMinutes = (d: Date): number => d.getHours() * 60 + d.getMinutes()
+
+/**
+ * When a catchup is, from real timestamps:
+ *   "Wednesday, Jul 8 · 2:00 PM – 2:15 PM"
+ * Returns "time to be set" if the start is missing (legacy rows).
+ */
+export const catchupWhen = (startISO: string | null, endISO: string | null, now: Date): string => {
+  if (!startISO) return 'time to be set'
+  const s = new Date(startISO)
+  const day = shipDayHeading(startISO, now)
+  const startLabel = fmt(localMinutes(s))
+  const endLabel = endISO ? ` – ${fmt(localMinutes(new Date(endISO)))}` : ''
+  return `${day} · ${startLabel}${endLabel}`
+}

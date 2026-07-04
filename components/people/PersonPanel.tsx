@@ -3,15 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { X, Send, AlertTriangle, Check, CalendarDays } from "lucide-react"
 import { Avatar } from "@/components/shell/Avatar"
-import { Tag } from "@/components/ui/Tag"
 import { Button } from "@/components/ui/Button"
 import { useDirectMessages } from "@/lib/hooks/useDirectMessages"
-import { useCatchup } from "@/lib/hooks/useCatchups"
+import { useCatchup, CATCHUP_MINUTES } from "@/lib/hooks/useCatchups"
 import { useSocial, type ChatPerson } from "@/components/shell/SocialProvider"
-import { useSavedSchedule } from "@/lib/hooks/useSavedSchedule"
-import { useEventData } from "@/lib/data/useEventData"
-import { buildAgenda, overlaps, type AgendaItem } from "@/lib/schedule"
-import { hm, fmt } from "@/lib/time"
+import { fmt, catchupWhen } from "@/lib/time"
 import { colors, radii, fonts, fontSize, fontWeight, spacing, shadows } from "@/lib/design/tokens"
 
 const oxbloodSoft = colors.liveSoft
@@ -27,8 +23,6 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
   const { thread, send, meId } = useDirectMessages(person.id)
   const { catchup, propose, accept, decline, cancel } = useCatchup(person.id)
   const { catchups: myCatchups } = useSocial()
-  const { saved } = useSavedSchedule()
-  const { sessions, days } = useEventData()
 
   const [input, setInput] = useState("")
   const endRef = useRef<HTMLDivElement>(null)
@@ -79,9 +73,6 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
             meId={meId}
             catchup={catchup}
             myCatchups={myCatchups}
-            saved={saved}
-            sessions={sessions}
-            days={days}
             propose={propose}
             accept={accept}
             decline={decline}
@@ -122,23 +113,18 @@ interface CatchupStripProps {
   meId: string | null
   catchup: ReturnType<typeof useCatchup>["catchup"]
   myCatchups: ReturnType<typeof useSocial>["catchups"]
-  saved: Set<string>
-  sessions: { id: string; day: number; start: number; end: number; title: string }[]
-  days: { idx: number; date: string; label: string }[]
-  propose: (day: number, startMin: number) => Promise<void>
+  propose: (startsAtISO: string) => Promise<void>
   accept: () => Promise<void>
   decline: () => Promise<void>
   cancel: () => Promise<void>
 }
 
-function CatchupStrip({ person, meId, catchup, myCatchups, saved, sessions, days, propose, accept, decline, cancel }: CatchupStripProps) {
+function CatchupStrip({ person, meId, catchup, myCatchups, propose, accept, decline, cancel }: CatchupStripProps) {
   if (!catchup) {
-    return <ProposeCatchupForm person={person} myCatchups={myCatchups} saved={saved} sessions={sessions} days={days} onPropose={propose} />
+    return <ProposeCatchupForm person={person} myCatchups={myCatchups} onPropose={propose} />
   }
 
-  const dayMeta = days.find(d => d.idx === catchup.day)
-  const dayLabel = dayMeta ? dayMeta.date : `Day ${catchup.day + 1}`
-  const timeLabel = `${dayLabel} · ${fmt(catchup.start_min)}–${fmt(catchup.end_min)}`
+  const timeLabel = catchupWhen(catchup.starts_at, catchup.ends_at, new Date())
   const firstName = person.name.split(" ")[0]
 
   if (catchup.status === "proposed") {
@@ -180,34 +166,42 @@ function CatchupStrip({ person, meId, catchup, myCatchups, saved, sessions, days
   return null
 }
 
+/** yyyy-mm-dd for a Date in local time (for <input type="date">). */
+function toDateInput(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
 function ProposeCatchupForm({
-  person, myCatchups, saved, sessions, days, onPropose,
+  person, myCatchups, onPropose,
 }: {
   person: ChatPerson
   myCatchups: ReturnType<typeof useSocial>["catchups"]
-  saved: Set<string>
-  sessions: { id: string; day: number; start: number; end: number; title: string }[]
-  days: { idx: number; date: string; label: string }[]
-  onPropose: (day: number, startMin: number) => Promise<void>
+  onPropose: (startsAtISO: string) => Promise<void>
 }) {
-  const [day, setDay] = useState<number>(days[0]?.idx ?? 1)
-  const [start, setStart] = useState<number>(hm(11, 0))
   const [open, setOpen] = useState(false)
+  const today = useMemo(() => toDateInput(new Date()), [])
+  const [date, setDate] = useState<string>(today)
+  const [startMin, setStartMin] = useState<number>(11 * 60) // 11:00
 
   const TIMES = useMemo(() => {
     const arr: number[] = []
-    for (let m = hm(8, 0); m <= hm(22, 45); m += 15) arr.push(m)
+    for (let m = 8 * 60; m <= 22 * 60 + 45; m += 15) arr.push(m)
     return arr
   }, [])
 
-  const end = start + 15
-  const savedItems: AgendaItem[] = sessions
-    .filter(s => saved.has(s.id))
-    .map(s => ({ id: s.id, day: s.day, start: s.start, end: s.end, title: s.title, kind: "session" as const }))
-  const acceptedOtherCatchups = myCatchups.filter(c => c.status === "accepted")
-  const agenda = buildAgenda(savedItems, acceptedOtherCatchups, () => "Builder").filter(it => it.day === day)
-  const candidate = { id: "candidate", day, start, end }
-  const conflicts = agenda.filter(it => overlaps(candidate, it))
+  // Compose the proposed window as real timestamps.
+  const [y, mo, d] = date.split("-").map(Number)
+  const startsAt = new Date(y, (mo ?? 1) - 1, d ?? 1, Math.floor(startMin / 60), startMin % 60)
+  const startMs = startsAt.getTime()
+  const endMs = startMs + CATCHUP_MINUTES * 60_000
+
+  // Warn if it overlaps one of your already-accepted catchups.
+  const conflict = myCatchups.find((c) => {
+    if (c.status !== "accepted" || !c.starts_at) return false
+    const cs = new Date(c.starts_at).getTime()
+    const ce = c.ends_at ? new Date(c.ends_at).getTime() : cs + CATCHUP_MINUTES * 60_000
+    return cs < endMs && startMs < ce
+  })
 
   if (!open) {
     return (
@@ -221,30 +215,32 @@ function ProposeCatchupForm({
 
   return (
     <div style={{ padding: "12px 16px", borderBottom: `1.4px solid ${colors.line}`, flexShrink: 0 }}>
-      <div style={{ fontFamily: fonts.mono, fontSize: fontSize.label, color: colors.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Day</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 10 }}>
-        {days.map(d => <Tag key={d.idx} active={day === d.idx} onClick={() => setDay(d.idx)}>{d.date}</Tag>)}
-      </div>
+      <div style={{ fontFamily: fonts.mono, fontSize: fontSize.label, color: colors.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Date</div>
+      <input
+        type="date"
+        value={date}
+        min={today}
+        onChange={(e) => setDate(e.target.value)}
+        style={{ width: "100%", border: `1.4px solid ${colors.line}`, borderRadius: radii.md, padding: "9px 11px", fontSize: fontSize.body, background: colors.surface, color: colors.ink, outline: "none", marginBottom: 10, boxSizing: "border-box" }}
+      />
 
       <div style={{ fontFamily: fonts.mono, fontSize: fontSize.label, color: colors.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Time</div>
-      <select value={start} onChange={e => setStart(+e.target.value)}
+      <select value={startMin} onChange={(e) => setStartMin(+e.target.value)}
         style={{ width: "100%", border: `1.4px solid ${colors.line}`, borderRadius: radii.md, padding: "9px 11px", fontSize: fontSize.body, background: colors.surface, color: colors.ink, outline: "none", marginBottom: 10 }}>
-        {TIMES.map(m => <option key={m} value={m}>{fmt(m)} {"–"} {fmt(m + 15)}</option>)}
+        {TIMES.map((m) => <option key={m} value={m}>{fmt(m)} {"–"} {fmt(m + CATCHUP_MINUTES)}</option>)}
       </select>
 
-      <div style={{ borderRadius: radii.lg, padding: "10px 12px", fontSize: fontSize.meta, lineHeight: 1.5, background: conflicts.length ? oxbloodSoft : colors.goSoft, color: conflicts.length ? colors.oxblood : colors.go, display: "flex", gap: 8, marginBottom: 10 }}>
-        {conflicts.length ? <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} /> : <Check size={15} style={{ flexShrink: 0, marginTop: 1 }} />}
-        <div>
-          {conflicts.length
-            ? `Overlaps with ${conflicts.map(c => `"${c.title}" (${fmt(c.start)}-${fmt(c.end)})`).join(" and ")}.`
-            : "This slot is free on your schedule."}
+      {conflict && (
+        <div style={{ borderRadius: radii.lg, padding: "10px 12px", fontSize: fontSize.meta, lineHeight: 1.5, background: oxbloodSoft, color: colors.oxblood, display: "flex", gap: 8, marginBottom: 10 }}>
+          <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div>You already have a catchup with {conflict.otherName ?? "someone"} at that time.</div>
         </div>
-      </div>
+      )}
 
       <div style={{ display: "flex", gap: 8 }}>
         <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
-        <Button variant="primary" size="sm" onClick={() => { onPropose(day, start); setOpen(false) }}>
-          {conflicts.length ? "Propose anyway" : `Propose to ${person.name.split(" ")[0]}`}
+        <Button variant="primary" size="sm" onClick={() => { onPropose(startsAt.toISOString()); setOpen(false) }}>
+          {conflict ? "Propose anyway" : `Propose to ${person.name.split(" ")[0]}`}
         </Button>
       </div>
     </div>
