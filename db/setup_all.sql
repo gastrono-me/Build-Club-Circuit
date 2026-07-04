@@ -673,6 +673,22 @@ create policy ships_auth_update on storage.objects
 
 
 -- ─────────────────────────────────────────────────────────
+-- db/migrations/017_activity_reads.sql
+-- ─────────────────────────────────────────────────────────
+-- 017 activity notifications: a read cursor for "who reacted to my ships".
+create table if not exists public.activity_reads (
+  user_id      uuid primary key references public.profiles(id) on delete cascade,
+  last_read_at timestamptz not null default now()
+);
+
+alter table public.activity_reads enable row level security;
+
+drop policy if exists activity_reads_all_own on public.activity_reads;
+create policy activity_reads_all_own on public.activity_reads
+  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+
+-- ─────────────────────────────────────────────────────────
 -- db/seed.sql
 -- ─────────────────────────────────────────────────────────
 -- seed: a few starter blockers so the Radar feed is never empty (community/seed posts, no author)

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState } from "react"
 import { useCatchups, type CatchupAgendaRow } from "@/lib/hooks/useCatchups"
 import { useInbox, type InboxConversation } from "@/lib/hooks/useInbox"
+import { useActivity, type ActivityRow } from "@/lib/hooks/useActivity"
 import { PersonPanel } from "@/components/people/PersonPanel"
 
 export type { InboxConversation }
@@ -28,6 +29,12 @@ interface SocialApi {
   inbox: InboxConversation[]
   totalUnread: number
   markRead: (otherId: string) => void
+  /** Cheers on my own ships, newest first. */
+  activity: ActivityRow[]
+  /** Groups with cheers newer than my read cursor. */
+  unreadActivity: number
+  /** Mark all activity seen (called when the notifications surface opens). */
+  markActivityRead: () => void
 }
 
 const SocialContext = createContext<SocialApi | null>(null)
@@ -35,6 +42,7 @@ const SocialContext = createContext<SocialApi | null>(null)
 export function SocialProvider({ children }: { children: React.ReactNode }) {
   const { catchups, cancel: cancelCatchup } = useCatchups()
   const { conversations: inbox, totalUnread, markRead } = useInbox()
+  const { activity, unreadActivity, markActivityRead } = useActivity()
   const [panelPerson, setPanelPerson] = useState<ChatPerson | null>(null)
   const [panelFocus, setPanelFocus] = useState<"chat" | "catchup">("chat")
 
@@ -52,6 +60,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     inbox,
     totalUnread,
     markRead,
+    activity,
+    unreadActivity,
+    markActivityRead,
   }
 
   return (

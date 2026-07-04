@@ -2,28 +2,36 @@
 
 import React, { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Menu, X } from "lucide-react"
 import { colors, fonts, fontSize, fontWeight, spacing, radii, shadows, motion } from "@/lib/design/tokens"
 import { NAV_GROUPS, isActivePath, type NavItem } from "@/lib/nav"
 import { GroupLabel } from "@/components/shell/Nav"
 import { Avatar } from "@/components/shell/Avatar"
-import { CatchupRequestRow, MessageRow } from "@/components/shell/NotificationItems"
+import { CatchupRequestRow, CheerNotificationRow, MessageRow } from "@/components/shell/NotificationItems"
 import { useProfile } from "@/lib/hooks/useProfile"
 import { useSocial } from "@/components/shell/SocialProvider"
 
 /** Mobile-only hamburger trigger + slide-out drawer holding nav, mode/clock controls, and messages. */
 export function MobileMenu() {
   const pathname = usePathname()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
 
   const { profile, loading } = useProfile()
   const name = loading || !profile ? "Profile" : profile.name || "Profile"
   const avatar_url = profile?.avatar_url
 
-  const { inbox, totalUnread, pendingCatchups, openPanel } = useSocial()
-  const notificationCount = totalUnread + pendingCatchups.length
+  const { inbox, totalUnread, pendingCatchups, openPanel, activity, unreadActivity, markActivityRead } = useSocial()
+  const notificationCount = totalUnread + pendingCatchups.length + unreadActivity
   const badgeCount = notificationCount > 9 ? "9+" : String(notificationCount)
+
+  // Opening the drawer surfaces the cheers, so mark them seen (same rationale as
+  // the desktop bell).
+  function openDrawer() {
+    setOpen(true)
+    markActivityRead()
+  }
 
   return (
     <>
@@ -40,7 +48,7 @@ export function MobileMenu() {
 
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openDrawer}
         aria-label="Open menu"
         className="vec-hamburger"
         style={{
@@ -208,6 +216,34 @@ export function MobileMenu() {
                   variant="drawer"
                   onClick={() => {
                     openPanel({ id: c.otherId, name: c.otherName ?? "Builder", avatar: c.otherAvatar }, "catchup")
+                    setOpen(false)
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Cheers on my ships */}
+          {activity.length > 0 && (
+            <div style={{ padding: spacing[3] }}>
+              <div
+                style={{
+                  fontFamily: fonts.mono,
+                  fontSize: fontSize.label,
+                  color: colors.mutedSoft,
+                  letterSpacing: "0.06em",
+                  marginBottom: spacing[2],
+                }}
+              >
+                YOUR SHIPS
+              </div>
+              {activity.map((a) => (
+                <CheerNotificationRow
+                  key={a.postId}
+                  activity={a}
+                  variant="drawer"
+                  onClick={() => {
+                    router.push("/home")
                     setOpen(false)
                   }}
                 />

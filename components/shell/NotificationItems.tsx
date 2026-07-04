@@ -4,6 +4,7 @@ import React from "react"
 import { CalendarDays } from "lucide-react"
 import { Avatar } from "@/components/shell/Avatar"
 import type { CatchupAgendaRow } from "@/lib/hooks/useCatchups"
+import type { ActivityRow } from "@/lib/hooks/useActivity"
 import type { InboxConversation } from "@/components/shell/SocialProvider"
 import { catchupWhen } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, spacing, radii } from "@/lib/design/tokens"
@@ -74,6 +75,95 @@ export function CatchupRequestRow({
           {catchupWhen(catchup.starts_at, catchup.ends_at, new Date())}
         </span>
       </div>
+    </button>
+  )
+}
+
+/** A "someone cheered your ship" row, shared between the bell dropdown and the drawer. */
+export function CheerNotificationRow({
+  activity,
+  variant,
+  onClick,
+}: {
+  activity: ActivityRow
+  variant: NotificationVariant
+  onClick: () => void
+}) {
+  const dropdown = variant === "dropdown"
+  const others = activity.cheerCount - 1
+  const who = activity.latestName ?? "A builder"
+  const headline =
+    others > 0
+      ? `${who} + ${others} other${others === 1 ? "" : "s"} cheered your ship`
+      : `${who} cheered your ship`
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: spacing[2],
+        width: "100%",
+        padding: dropdown ? `${spacing[3]}px ${spacing[3]}px` : `${spacing[2]}px 0`,
+        background: dropdown && activity.unread ? colors.goSoft : "transparent",
+        border: "none",
+        borderBottom: `1px solid ${colors.line}`,
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      <div style={{ position: "relative", flexShrink: 0 }}>
+        <Avatar name={activity.latestName ?? "Builder"} photo={activity.latestAvatar} size={28} />
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            bottom: -3,
+            right: -4,
+            fontSize: 12,
+            lineHeight: 1,
+            filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.25))",
+          }}
+        >
+          👏
+        </span>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: spacing[1] }}>
+          <span
+            style={{
+              fontFamily: fonts.body,
+              fontSize: fontSize.meta,
+              fontWeight: fontWeight.medium,
+              color: colors.ink,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {headline}
+          </span>
+          <span style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft, flexShrink: 0 }}>
+            {relTime(activity.lastAt)}
+          </span>
+        </div>
+        <span
+          style={{
+            fontFamily: fonts.body,
+            fontSize: fontSize.micro,
+            color: colors.muted,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            display: "block",
+          }}
+        >
+          {activity.note}
+        </span>
+      </div>
+      {activity.unread && (
+        <div style={{ width: 8, height: 8, borderRadius: radii.pill, background: colors.go, flexShrink: 0 }} />
+      )}
     </button>
   )
 }

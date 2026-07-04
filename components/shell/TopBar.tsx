@@ -2,10 +2,11 @@
 
 import React, { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
 import { MobileMenu } from "@/components/shell/MobileMenu"
 import { Avatar } from "@/components/shell/Avatar"
-import { CatchupRequestRow, MessageRow } from "@/components/shell/NotificationItems"
+import { CatchupRequestRow, CheerNotificationRow, MessageRow } from "@/components/shell/NotificationItems"
 import { useProfile } from "@/lib/hooks/useProfile"
 import { useSocial } from "@/components/shell/SocialProvider"
 import {
@@ -24,11 +25,22 @@ export function TopBar() {
   const name = loading || !profile ? "Profile" : profile.name || "Profile"
   const avatar_url = profile?.avatar_url
 
-  const { inbox, totalUnread, pendingCatchups, openPanel } = useSocial()
+  const { inbox, totalUnread, pendingCatchups, openPanel, activity, unreadActivity, markActivityRead } = useSocial()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
 
-  const notificationCount = totalUnread + pendingCatchups.length
+  const notificationCount = totalUnread + pendingCatchups.length + unreadActivity
   const badgeCount = notificationCount > 9 ? "9+" : String(notificationCount)
+
+  // Opening the bell is the "seen" moment for cheers — there's no deeper view
+  // to open, so mark them read here (messages mark read when their thread opens).
+  function toggleOpen() {
+    setOpen((prev) => {
+      const next = !prev
+      if (next) markActivityRead()
+      return next
+    })
+  }
 
   return (
     <header
@@ -105,7 +117,7 @@ export function TopBar() {
 
         {/* Bell button */}
         <button
-          onClick={() => setOpen((prev) => !prev)}
+          onClick={toggleOpen}
           aria-label="Notifications"
           style={{
             position: "relative",
@@ -180,7 +192,19 @@ export function TopBar() {
               />
             ))}
 
-            {inbox.length === 0 && pendingCatchups.length === 0 ? (
+            {activity.map((a) => (
+              <CheerNotificationRow
+                key={`cheer-${a.postId}`}
+                activity={a}
+                variant="dropdown"
+                onClick={() => {
+                  router.push("/home")
+                  setOpen(false)
+                }}
+              />
+            ))}
+
+            {inbox.length === 0 && pendingCatchups.length === 0 && activity.length === 0 ? (
               <div
                 style={{
                   padding: `${spacing[4]}px`,
