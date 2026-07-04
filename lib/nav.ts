@@ -9,6 +9,7 @@ import {
   Clock,
   Activity,
   Mic,
+  FolderGit2,
   type LucideIcon,
 } from "lucide-react"
 
@@ -39,6 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Your build",
     items: [
       { label: "Today", href: "/home", Icon: Home },
+      { label: "Projects", href: "/projects", Icon: FolderGit2 },
       { label: "Radar", href: "/radar", Icon: Activity },
       { label: "Pitch Coach", href: "/pitch", Icon: Mic },
     ],

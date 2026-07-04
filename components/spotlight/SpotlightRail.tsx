@@ -6,6 +6,7 @@ import { Avatar } from "@/components/shell/Avatar"
 import { Card } from "@/components/ui/Card"
 import { Tag } from "@/components/ui/Tag"
 import { selectSpotlight } from "@/lib/spotlight/rotation"
+import { shipTime } from "@/lib/time"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
 
@@ -132,7 +133,7 @@ export function SpotlightRail({
               {featured.author_name ?? "Builder"}
             </div>
             <div style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft, marginTop: 2 }}>
-              {timeAgo(featured.created_at, now)}
+              {shipTime(featured.created_at, now)}
             </div>
           </div>
           <Tag tone="go">{featured.category}</Tag>
@@ -211,15 +212,6 @@ function cheerStyle(mine: boolean, disabled: boolean): React.CSSProperties {
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.45 : 1,
   }
-}
-
-function timeAgo(iso: string, now: Date): string {
-  const mins = Math.floor((now.getTime() - new Date(iso).getTime()) / 60000)
-  if (mins < 1) return "just now"
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
 }
 
 function usePrefersReducedMotion(): boolean {

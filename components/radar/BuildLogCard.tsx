@@ -1,11 +1,13 @@
 "use client"
 
 import React from "react"
+import Link from "next/link"
 import { Card } from "@/components/ui/Card"
 import { Tag } from "@/components/ui/Tag"
 import { Avatar } from "@/components/shell/Avatar"
-import { MessageCircle, Star } from "lucide-react"
+import { FolderGit2, MessageCircle, Star } from "lucide-react"
 import { useSocial } from "@/components/shell/SocialProvider"
+import { shipTime } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
 
@@ -21,14 +23,11 @@ interface BuildLogCardProps {
   onToggleNominate?: () => void
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return "just now"
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
+/** Full local timestamp for the title tooltip, e.g. "Jul 2, 2026, 2:05 PM". */
+function fullStamp(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+  })
 }
 
 export function BuildLogCard({
@@ -91,6 +90,7 @@ export function BuildLogCard({
             )}
           </div>
           <div
+            title={fullStamp(post.created_at)}
             style={{
               fontFamily: fonts.mono,
               fontSize: fontSize.micro,
@@ -98,13 +98,36 @@ export function BuildLogCard({
               marginTop: 2,
             }}
           >
-            {timeAgo(post.created_at)}
+            {shipTime(post.created_at, new Date())}
           </div>
         </div>
 
         {/* Category tag */}
         <Tag tone="go">{post.category}</Tag>
       </div>
+
+      {/* Project chip — the arc this ship belongs to */}
+      {post.project_id && post.project_name && (
+        <Link
+          href={`/projects/${post.project_id}`}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            marginBottom: spacing[3],
+            padding: "3px 9px",
+            borderRadius: radii.pill,
+            background: colors.violetSoft,
+            color: colors.violet,
+            fontFamily: fonts.mono,
+            fontSize: fontSize.label,
+            letterSpacing: "0.03em",
+            textDecoration: "none",
+          }}
+        >
+          <FolderGit2 size={12} /> {post.project_name}
+        </Link>
+      )}
 
       {/* Note body */}
       <p
