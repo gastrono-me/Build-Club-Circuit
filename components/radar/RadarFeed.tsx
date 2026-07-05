@@ -8,10 +8,11 @@ import { EmbeddingPlot } from "@/components/radar/EmbeddingPlot"
 import { BuildLogFeed } from "@/components/radar/BuildLogFeed"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, letterSpacing } from "@/lib/design/tokens"
 
-type FeedTab = "stuck" | "shipped"
+type FeedTab = "shipped" | "stuck"
 
 export function RadarFeed({ eventId, compose = true }: { eventId?: string | null; compose?: boolean } = {}) {
-  const [tab, setTab] = React.useState<FeedTab>("stuck")
+  // Shipped leads: Explore is a ships-first archive; Stuck is the help lens.
+  const [tab, setTab] = React.useState<FeedTab>("shipped")
   const { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore } = useRadar(eventId)
   // Your just-posted blocker (id-stable, set from post()'s returned id).
   const [latestId, setLatestId] = React.useState<string | null>(null)
@@ -71,7 +72,7 @@ export function RadarFeed({ eventId, compose = true }: { eventId?: string | null
           padding: 2,
         }}
       >
-        {(["stuck", "shipped"] as FeedTab[]).map(t => {
+        {(["shipped", "stuck"] as FeedTab[]).map(t => {
           const active = tab === t
           return (
             <button

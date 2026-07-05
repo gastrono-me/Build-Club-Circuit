@@ -714,12 +714,12 @@ alter table public.projects
 -- ─────────────────────────────────────────────────────────
 -- db/seed.sql
 -- ─────────────────────────────────────────────────────────
--- seed: a few starter blockers so the Radar feed is never empty (community/seed posts, no author)
+-- seed: a few starter blockers so the stuck feed is never empty (community/seed posts, no author)
 insert into public.blockers (author_id, category, note) values
-  (null, 'Getting unstuck', 'Still haven''t received my API credits — anyone else waiting?'),
-  (null, 'RAG/Retrieval',  'Retrieval keeps surfacing irrelevant chunks. Think my chunking strategy is off.'),
-  (null, 'Deploy/Infra',   'Serverless function times out mid agent-loop. Need to trim latency somewhere.'),
-  (null, 'Launch/Demo',     '3-minute pitch is still 6 minutes of jargon. Need to cut it down hard.')
+  (null, 'Engineering', 'Retrieval keeps surfacing irrelevant chunks. Think my chunking strategy is off.'),
+  (null, 'Engineering', 'Serverless function times out mid agent-loop. Need to trim latency somewhere.'),
+  (null, 'Growth',      'Landing page converts at under 1 percent. Not sure if it is the copy or the audience.'),
+  (null, 'Fundraising', '3-minute pitch is still 6 minutes of jargon. Need to cut it down hard.')
 on conflict do nothing;
 
 -- seed events as episodes: one live now, one upcoming. Dates are relative to

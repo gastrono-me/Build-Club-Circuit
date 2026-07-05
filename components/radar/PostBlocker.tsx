@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { BLOCKER_TAGS } from "@/types/index"
+import { WORK_CATEGORIES } from "@/types/index"
 import { Button } from "@/components/ui/Button"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows, motion } from "@/lib/design/tokens"
 
@@ -10,7 +10,7 @@ interface PostBlockerProps {
 }
 
 export function PostBlocker({ onPost }: PostBlockerProps) {
-  const [category, setCategory] = useState<string>(BLOCKER_TAGS[0])
+  const [category, setCategory] = useState<string>(WORK_CATEGORIES[0])
   const [note, setNote] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -107,7 +107,7 @@ export function PostBlocker({ onPost }: PostBlockerProps) {
           onFocus={(e) => { e.currentTarget.style.borderColor = colors.violet }}
           onBlur={(e) => { e.currentTarget.style.borderColor = colors.line }}
         >
-          {BLOCKER_TAGS.map((tag) => (
+          {WORK_CATEGORIES.map((tag) => (
             <option key={tag} value={tag}>{tag}</option>
           ))}
         </select>

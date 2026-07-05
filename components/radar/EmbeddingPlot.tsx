@@ -5,8 +5,8 @@ import type { BlockerRow } from "@/lib/hooks/useRadar"
 import { layoutField, similarityLinks, type Point } from "@/lib/radar/similarity"
 import { colors, fonts, fontSize, fontWeight, spacing } from "@/lib/design/tokens"
 import { EmbeddingField, type FieldLink, type FieldNode } from "@/components/field/EmbeddingField"
-import { BLOCKER_CATEGORIES, RADAR_AXIS_LABELS, type CategoryColorKey } from "@/lib/config/event"
-import type { BlockerTag } from "@/lib/data/blocker-tags"
+import { WORK_CATEGORY_FIELD, RADAR_AXIS_LABELS, type CategoryColorKey } from "@/lib/config/event"
+import { WORK_CATEGORIES, type WorkCategory } from "@/lib/data/work-categories"
 
 const COLOR_TOKENS: Record<CategoryColorKey, string> = {
   ink: colors.ink,
@@ -16,11 +16,11 @@ const COLOR_TOKENS: Record<CategoryColorKey, string> = {
 }
 
 const CATEGORY_ANCHORS: Record<string, Point> = Object.fromEntries(
-  Object.entries(BLOCKER_CATEGORIES).map(([cat, { anchor }]) => [cat, anchor]),
+  Object.entries(WORK_CATEGORY_FIELD).map(([cat, { anchor }]) => [cat, anchor]),
 )
 
 function catColor(category: string): string {
-  const entry = BLOCKER_CATEGORIES[category as BlockerTag]
+  const entry = WORK_CATEGORY_FIELD[category as WorkCategory]
   return entry ? COLOR_TOKENS[entry.color] : colors.ink
 }
 
@@ -78,11 +78,11 @@ export function EmbeddingPlot({
     }
   }
 
-  // Legend categories actually present in data (show at most 3)
+  // Legend categories actually present in data (show at most 3, taxonomy order)
   const presentCategories = React.useMemo(() => {
     const s = new Set(blockers.map((b) => b.category))
-    const priority = ["RAG/Retrieval", "hackathon help", "Deploy/Infra"]
-    const shown = priority.filter((c) => s.has(c))
+    const shown: string[] = WORK_CATEGORIES.filter((c) => s.has(c)).slice(0, 3)
+    // Legacy categories (old rows) fill remaining slots so the legend never lies.
     if (shown.length < 3) {
       for (const c of s) {
         if (!shown.includes(c) && shown.length < 3) shown.push(c)

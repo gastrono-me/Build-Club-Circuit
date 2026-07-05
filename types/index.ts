@@ -76,8 +76,7 @@ export interface Blocker {
 
 // ---- Constants --------------------------------------------------------------
 
-export { BLOCKER_TAGS, type BlockerTag } from '@/lib/data/blocker-tags'
-export { SHIP_CATEGORIES, type ShipCategory } from '@/lib/data/ship-categories'
+export { WORK_CATEGORIES, type WorkCategory } from '@/lib/data/work-categories'
 
 // ---- Profile option lists (ported from legacy/App.jsx) ------------------
 
