@@ -105,12 +105,19 @@ export interface BuildLogFilter {
   category?: string | null
   /** Case-insensitive author-name fragment, or null for everyone. */
   author?: string | null
+  /**
+   * Fetch the paginated browse feed (`posts`). Surfaces that only need
+   * today's ships + streak (Today, the event rail) pass false and skip the
+   * archive page + its cheer counts entirely.
+   */
+  browse?: boolean
 }
 
 export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
   // Primitive deps so callers can pass a fresh object literal each render.
   const filterCategory = filter?.category ?? null
   const filterAuthor = filter?.author?.trim() || null
+  const browse = filter?.browse ?? true
 
   const [posts, setPosts] = useState<BuildLogRow[]>([])
   const [todayPosts, setTodayPosts] = useState<BuildLogRow[]>([])
@@ -136,14 +143,18 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
 
     // Browse feed: newest-first, bounded by the current page size. Filters
     // apply here only — todayPosts (spotlight) and streak dates stay unfiltered.
-    let pageQuery = supabase
-      .from("build_log")
-      .select(POST_SELECT)
-      .order("created_at", { ascending: false })
-      .limit(limit)
-    if (eventId) pageQuery = pageQuery.eq("event_id", eventId)
-    if (filterCategory) pageQuery = pageQuery.eq("category", filterCategory)
-    if (filterAuthor) pageQuery = pageQuery.ilike("profiles.name", `%${filterAuthor}%`)
+    // Skipped entirely when the caller doesn't render the archive.
+    let pageQuery: any = null
+    if (browse) {
+      pageQuery = supabase
+        .from("build_log")
+        .select(POST_SELECT)
+        .order("created_at", { ascending: false })
+        .limit(limit)
+      if (eventId) pageQuery = pageQuery.eq("event_id", eventId)
+      if (filterCategory) pageQuery = pageQuery.eq("category", filterCategory)
+      if (filterAuthor) pageQuery = pageQuery.ilike("profiles.name", `%${filterAuthor}%`)
+    }
 
     // Today's ships (spotlight + counter): bounded to one UTC day, not the page.
     let todayQuery = supabase
@@ -164,7 +175,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
       : null
 
     const [pageRes, todayRes, myDatesRes] = await Promise.all([
-      pageQuery,
+      pageQuery ?? Promise.resolve({ data: [], error: null } as any),
       todayQuery,
       myDatesQuery ?? Promise.resolve({ data: [], error: null } as any),
     ])
@@ -207,7 +218,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
     setCheerCounts(counts)
     setMineCheers(mine)
     setLoading(false)
-  }, [eventId, limit, filterCategory, filterAuthor])
+  }, [eventId, limit, filterCategory, filterAuthor, browse])
 
   // Keep the refetch pointing at the latest fetch (which closes over eventId +
   // limit) without re-subscribing the broadcast channel each time those change.

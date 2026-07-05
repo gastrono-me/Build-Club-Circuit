@@ -171,7 +171,7 @@ export function EmbeddingPlot({
       >
         {selectedBlocker.author_id == null
           ? "Community"
-          : (selectedBlocker.author_name ?? "Attendee")}
+          : (selectedBlocker.author_name ?? "Builder")}
       </div>
       <button
         type="button"
@@ -210,7 +210,7 @@ export function EmbeddingPlot({
   return (
     <EmbeddingField
       ariaLabel="Embedding field of current blockers"
-      title="Bottleneck Radar"
+      title="Stuck field"
       headerRight={
         <div aria-hidden style={{ display: "flex", gap: 14, alignItems: "center" }}>
           {presentCategories.map((cat) => (

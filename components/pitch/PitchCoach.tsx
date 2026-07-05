@@ -42,8 +42,8 @@ export function PitchCoach() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: spacing[4] }}>
-      <SectionTitle kicker="Line · lock in" title="Pitch Coach"
-        note="Three minutes, judged on the same rubric the real judges use. Practice it, then get torn apart before they do." />
+      <SectionTitle kicker="Your build" title="Pitch Coach"
+        note="Three minutes on the clock. Practice your pitch and get blunt feedback before an investor, customer, or demo audience hears it." />
 
       <div style={{ background: colors.ink, color: colors.onDark, borderRadius: radii["2xl"], padding: 20, marginBottom: spacing[5], display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
@@ -66,7 +66,7 @@ export function PitchCoach() {
         <div style={{ marginTop: 10 }}>
           <Button variant="primary" onClick={getFeedback} disabled={loading || !pitch.trim()}
             icon={loading ? <Loader2 size={15} className="vec-spin" /> : undefined}>
-            {loading ? "Judging" : "Get torn apart"}
+            {loading ? "Reviewing" : "Get feedback"}
           </Button>
         </div>
         {feedback && (

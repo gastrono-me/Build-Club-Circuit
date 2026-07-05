@@ -247,7 +247,7 @@ export function ProfileForm() {
                   value={bio}
                   onChange={e => setBio(e.target.value.slice(0, MAX_BIO))}
                   rows={3}
-                  placeholder="A short bio visible to other attendees"
+                  placeholder="A short bio visible to other builders"
                   style={{
                     width: "100%",
                     border: "none",

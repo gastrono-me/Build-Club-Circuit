@@ -32,7 +32,8 @@ export function EventDetailView({ slug }: { slug: string }) {
   const event = useMemo(() => events.find((e) => e.slug === slug) ?? null, [events, slug])
 
   const railEventId = scope === "event" ? (event?.id ?? null) : null
-  const { todayPosts, cheerCounts, mineCheers, toggleCheer, userId } = useBuildLog(railEventId)
+  // browse:false — the rail only shows today's ships; RadarFeed below fetches its own feed.
+  const { todayPosts, cheerCounts, mineCheers, toggleCheer, userId } = useBuildLog(railEventId, { browse: false })
   const { openPanel } = useSocial()
 
   if (loading || !now) {

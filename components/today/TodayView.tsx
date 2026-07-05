@@ -23,7 +23,8 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/
  * calendar days.
  */
 export function TodayView() {
-  const { todayPosts, myPostDates, post, toggleCheer, cheerCounts, mineCheers, userId } = useBuildLog()
+  // browse:false — Today renders only today's ships; skip fetching the archive page.
+  const { todayPosts, myPostDates, post, toggleCheer, cheerCounts, mineCheers, userId } = useBuildLog(null, { browse: false })
   const { profile } = useProfile()
   const { openPanel } = useSocial()
 

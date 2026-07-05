@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/client"
 /**
  * The signed-in builder's spotlight nominations: the set of their own post ids
  * they have opted in for an external feature. Per-post, default off. Optimistic
- * with revert on error. Mirrors the persistence shape of useSubmission. Not
- * realtime: it is a personal opt-in queue, not a shared feed.
+ * with revert on error. Not realtime: it is a personal opt-in queue, not a
+ * shared feed.
  */
 export function useSpotlightNominations() {
   const [mine, setMine] = useState<Set<string>>(new Set())

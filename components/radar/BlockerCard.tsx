@@ -42,7 +42,7 @@ export function BlockerCard({
 
   const authorName = blocker.author_id == null
     ? "Community"
-    : (blocker.author_name ?? "Attendee")
+    : (blocker.author_name ?? "Builder")
 
   const isAnonymous = blocker.author_id == null
 
@@ -56,10 +56,6 @@ export function BlockerCard({
     }
   }
 
-  // "Talk" — links to author profile page when available; stub otherwise
-  const talkHref = (!isAnonymous && !isOwn && blocker.author_id)
-    ? `/attendees/${blocker.author_id}`
-    : null
 
   return (
     <Card spine="live" padding={spacing[4]}>
@@ -176,37 +172,9 @@ export function BlockerCard({
           )}
         </button>
 
-        {/* Talk affordance — only shown when there's a real author who isn't self */}
-        {talkHref && (
-          <a
-            href={talkHref}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-              padding: "6px 12px",
-              borderRadius: 999,
-              border: `1.5px solid ${colors.line}`,
-              background: colors.panel,
-              color: colors.muted,
-              fontFamily: fonts.mono,
-              fontSize: fontSize.label,
-              fontWeight: fontWeight.medium,
-              letterSpacing: "0.04em",
-              textDecoration: "none",
-              transition: `background ${motion.fast} ${motion.ease}`,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = colors.violetSoft }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = colors.panel }}
-          >
-            <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>💬</span>
-            Talk
-          </a>
-        )}
-
         {blocker.author_id && !isOwn && (
-          <button onClick={() => openPanel({ id: blocker.author_id!, name: blocker.author_name ?? "Attendee", avatar: blocker.author_avatar }, "chat")}
-            title={`Message ${blocker.author_name ?? "attendee"}`} aria-label="Message author"
+          <button onClick={() => openPanel({ id: blocker.author_id!, name: blocker.author_name ?? "Builder", avatar: blocker.author_avatar }, "chat")}
+            title={`Message ${blocker.author_name ?? "builder"}`} aria-label="Message author"
             style={{ display: "inline-flex", alignItems: "center", gap: 5, border: `1.4px solid ${colors.line}`, background: colors.surface, color: colors.ink, borderRadius: radii.md, padding: "6px 10px", fontFamily: fonts.mono, fontSize: fontSize.label, cursor: "pointer" }}>
             <MessageCircle size={13} /> Message
           </button>

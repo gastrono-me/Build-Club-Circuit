@@ -20,8 +20,8 @@ export interface PeopleFieldProps {
 }
 
 /**
- * The room as an embedding field of people — the Pulse twin of the Bottleneck
- * Radar. Attendees are positioned by interest similarity (so domains cluster),
+ * The cohort as an embedding field of people — the People twin of the stuck
+ * field. Builders are positioned by interest similarity (so domains cluster),
  * and vectors shoot from you to the few people who most *complete* you:
  * reciprocal intent + complementary skills, every link explained. Tap a node to
  * see why, then request a catchup. Degrades to nothing when the room is too

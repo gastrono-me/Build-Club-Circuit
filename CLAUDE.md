@@ -2,9 +2,9 @@
 
 The everyday tool for Build Club builders. Circuit is **evergreen**: it works day-to-day (the async builder journey) and lights up during live events, so Build Club becomes part of the operating structure of being a founder/builder. Events are high-intensity *episodes* on a continuous arc, not the whole product.
 
-**The daily spine is the ship ritual + streak.** Home (`/` → `components/today/TodayView.tsx`) asks "Did you ship today?", shows your streak (`lib/streak/streak.ts`, computed from `build_log`), and the cohort's ships. This runs on **real time**, not the sim clock.
+**The daily spine is the ship ritual + streak.** Home (`/home` → `components/today/TodayView.tsx`) is **strictly today**: "Did you ship today?", your streak (`lib/streak/streak.ts`, computed from `build_log`), your projects, a quiet "I'm stuck" blocker composer, and today's Spotlight. Everything older lives on **Explore** (`/explore`), the browse/archive surface: all past ships (filterable by work category + builder) and all blockers (list + the embedding-field "stuck" graph). Composing happens on Today; Explore is browse-only.
 
-One shell, one nav, every destination always reachable (no mode gate). `lib/nav.ts` is the single source of `NAV_GROUPS`, rendered by `Nav`/`MobileMenu`: **Your build** (the daily loop) · **Community** (the always-on graph) · **At an event** (episode-scoped surfaces — schedule/maps/deadline — still on seeded/sim data until Phase 3 makes events first-class).
+One shell, one nav, every destination always reachable (no mode gate). `lib/nav.ts` is the single source of `NAV_GROUPS`, rendered by `Nav`/`MobileMenu` (plus `MobileTabBar` for the bottom tabs): **Your build** (Today · Projects · Pitch Coach) · **Community** (Explore · People · Events). Ships and blockers share one taxonomy, `lib/data/work-categories.ts` (discipline-spanning: Product/Engineering/Design/Growth/Sales/…), which also drives the embedding-field anchors in `lib/config/event.ts`.
 
 > Heritage: Circuit grew out of **Vector**, an in-event toolkit built for Agentic AI Build Week (AABW). `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and `docs/DEVPOST.md` still describe the Vector era and are accurate for the event-side architecture, but predate the Circuit pivot — read them with that in mind.
 
@@ -21,7 +21,7 @@ npm run dev                     # http://localhost:3000
 npm run test                    # vitest (pure logic in lib/)
 npm run build                   # production build
 ```
-You need a Supabase project with the schema applied (`db/migrations/*.sql` then `db/seed.sql`, run in the Supabase SQL editor) and in `.env.local`:
+You need a Supabase project with the schema applied. **Migrations are automated**: pushing to `main` runs `.github/workflows/migrate.yml` (`scripts/migrate.mjs`), which applies any new `db/migrations/*.sql` and tracks them in `public._migrations` (needs the `SUPABASE_DB_URL` repo secret — the **Session pooler** connection string, port 5432). For a brand-new project you can instead paste `db/setup_all.sql` + `db/seed.sql` into the SQL editor once. Then in `.env.local`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable / anon key>
@@ -35,13 +35,13 @@ Email magic-link sign-in works with no extra setup. Google/GitHub OAuth need pro
 4. **Add the deployed URL to Supabase Auth → URL Configuration** redirect allow-list, or magic-link/OAuth redirects fail.
 5. **Deploys are Git-integrated.** The Vercel project `buildclubvector/build-club-circuit` is connected to this repo (https://vercel.com/buildclubvector/build-club-circuit), so pushing to `main` auto-deploys Production and branches/PRs get Preview deploys — no CLI needed. (Vector used the `vercel --prod` CLI because that account lacked GitHub-org access; Circuit doesn't.) `.vercelignore` still keeps `.env*`, `docs`, and local scratch out of any manual CLI upload.
 
-## What's real vs mock (important context)
-- **Real / persisted:** accounts (magic-link; OAuth when configured), profiles, saved schedule, deadline checklist + DevPost URL, direct messages and catchup proposals between signed-in users, the **Bottleneck Radar** feed, and the **Build Log** feed (all live across users via Supabase Realtime). The Build Log now also powers the home **ship ritual + streak** — Circuit's daily spine.
-- **Mock / seeded:** the event calendar, the People directory's example attendees (real signed-in users appear alongside them), and the Maps (illustrative SVG). Chatting with a mock attendee uses a separate per-user-only simulated thread (`chat_messages`/`connections`), not a real two-way conversation — don't confuse it with the real `messages` table.
-- **AI:** runs on local-logic fallbacks (no token spend) — readiness review and Pitch Coach feedback. `api/claude.js` is a server proxy stub, currently unused/keyless.
+## What's real vs seeded (important context)
+- **Real / persisted:** everything user-facing — accounts (magic-link; OAuth when configured), profiles, ships (with photo/file/link attachments in the public `ships` bucket) + cheers + spotlight nominations, blockers + me-toos, projects (labels, links), direct messages, calendar catchups, and the notifications bell (messages + catchup requests + cheers on your ships, read cursor in `activity_reads`). Live updates fan out over a shared Realtime **Broadcast** bus (`lib/realtime/feedBus.ts`), not per-row postgres_changes.
+- **Seeded:** a few starter community blockers and the two events in `db/seed.sql`. Events are a real table with join/leave + member counts, but there's no create-event UI yet (Phase 3) — new events are inserted by hand.
+- **AI:** local-logic fallbacks only (no token spend) — match reasons in People and Pitch Coach feedback (`lib/ai/local-fallbacks.ts`). There is no server-side AI proxy; add one deliberately if a real AI feature lands.
 
 ## Conventions
-- **The whole look tunes from `lib/design/tokens.ts`** (mirrored as CSS vars in `app/globals.css`). Design system: "embedding field / architect plotter on paper" — paper `#EEF1F4`, ink `#14143C`, vector-blue accent `#2B2BF5`, Fraunces display + IBM Plex Sans/Mono. Build UI from the primitives in `components/ui/*` + `components/shell/*`. The embedding-field plot pattern (`components/radar/EmbeddingPlot.tsx`) is shared by People (`PeopleField.tsx`) and Radar/Build Log — same layout idea, different similarity source.
-- **Time: the daily loop uses real time; the sim clock is event-only.** The ship ritual + streak (`TodayView`, `lib/streak/streak.ts`) key off real calendar days via `new Date()`. The user-controlled simulation (`lib/hooks/useSimClock.tsx`) survives only for event-episode surfaces (schedule/now/deadline) so their countdowns can still be demoed; it is no longer in the global chrome (removed from `TopBar`/`MobileMenu`). Do not wire the daily loop to the sim clock.
+- **The whole look tunes from `lib/design/tokens.ts`** (mirrored as CSS vars in `app/globals.css`). Design system: "embedding field / architect plotter on paper" — paper `#EEF1F4`, ink `#14143C`, vector-blue accent `#2B2BF5`, Fraunces display + IBM Plex Sans/Mono. Build UI from the primitives in `components/ui/*` + `components/shell/*`. The embedding-field pattern (`components/field/EmbeddingField.tsx` scaffold; layout math in `lib/radar/similarity.ts`) is shared by the Explore stuck graph (`components/radar/EmbeddingPlot.tsx`) and People (`PeopleField.tsx`) — same layout idea, different similarity source. (Note: `components/radar/` and `lib/radar/` keep their folder names for history; the user-facing surface is Explore.)
+- **Everything runs on real time** via `new Date()` — the sim clock was removed with the rest of the hackathon scaffolding. Streaks key off real calendar days; don't reintroduce simulated time into the daily loop.
 - Plain, factual copy. No em-dashes in user-facing strings.
 - Commit/push only when asked; the repo is `gastrono-me/Build-Club-Circuit`, default branch `main` (pushing `main` auto-deploys — see Deploy gotcha #5).
