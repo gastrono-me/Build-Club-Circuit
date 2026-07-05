@@ -32,7 +32,18 @@ export async function uploadShipMedia(file: File): Promise<ShipMedia> {
   const { error } = await supabase.storage
     .from("ships")
     .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false })
-  if (error) throw error
+  if (error) {
+    // The bucket enforces size + mime limits server-side (migration 020);
+    // translate its raw messages into something a builder can act on.
+    const msg = error.message?.toLowerCase() ?? ""
+    if (msg.includes("mime") || msg.includes("content type") || msg.includes("not allowed")) {
+      throw new Error("That file type isn't supported. Try an image, video, PDF, or zip.")
+    }
+    if (msg.includes("size") || msg.includes("too large") || msg.includes("exceeded")) {
+      throw new Error("That file is over 10 MB. Try a smaller one.")
+    }
+    throw error
+  }
 
   const { data } = supabase.storage.from("ships").getPublicUrl(path)
   return { url: data.publicUrl, type: file.type || "application/octet-stream", name: file.name }

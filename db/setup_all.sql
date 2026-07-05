@@ -712,6 +712,62 @@ alter table public.projects
 
 
 -- ─────────────────────────────────────────────────────────
+-- db/migrations/020_storage_hardening.sql
+-- ─────────────────────────────────────────────────────────
+-- 020 storage hardening: owner-scoped writes + size/type limits on both buckets.
+update storage.buckets set
+  file_size_limit = 10485760,
+  allowed_mime_types = array[
+    'image/png','image/jpeg','image/gif','image/webp','image/avif',
+    'video/mp4','video/webm','video/quicktime',
+    'audio/mpeg','audio/wav','audio/mp4',
+    'application/pdf','application/zip','application/json',
+    'text/plain','text/markdown','text/csv',
+    'application/octet-stream'
+  ]
+where id = 'ships';
+
+update storage.buckets set
+  file_size_limit = 5242880,
+  allowed_mime_types = array['image/jpeg','image/png','image/webp']
+where id = 'avatars';
+
+drop policy if exists ships_auth_insert on storage.objects;
+create policy ships_auth_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'ships' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists ships_auth_update on storage.objects;
+drop policy if exists ships_owner_update on storage.objects;
+create policy ships_owner_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'ships' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'ships' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists ships_owner_delete on storage.objects;
+create policy ships_owner_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'ships' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists avatars_auth_insert on storage.objects;
+create policy avatars_auth_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists avatars_auth_update on storage.objects;
+drop policy if exists avatars_owner_update on storage.objects;
+create policy avatars_owner_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists avatars_owner_delete on storage.objects;
+create policy avatars_owner_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+
+-- ─────────────────────────────────────────────────────────
 -- db/seed.sql
 -- ─────────────────────────────────────────────────────────
 -- seed: a few starter blockers so the stuck feed is never empty (community/seed posts, no author)
