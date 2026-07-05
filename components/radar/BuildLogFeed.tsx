@@ -7,17 +7,22 @@ import { useSpotlightNominations } from "@/lib/hooks/useSpotlightNominations"
 import { WORK_CATEGORIES } from "@/lib/data/work-categories"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
+import { ShipsPlot } from "@/components/radar/ShipsPlot"
 import { SectionTitle } from "@/components/ui/SectionTitle"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
 
 /** Debounce for the builder-name search, so typing doesn't fire a query per key. */
 const SEARCH_DEBOUNCE_MS = 300
+/** The map is a recent-energy lens, not the archive: cap the nodes it plots. */
+const MAP_WINDOW = 60
 
 export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | null; compose?: boolean } = {}) {
   // Filters: category chip + builder-name search, both applied server-side.
   const [category, setCategory] = React.useState<string | null>(null)
   const [authorInput, setAuthorInput] = React.useState("")
   const [author, setAuthor] = React.useState<string | null>(null)
+  // List is the workhorse; the map is a discovery lens over the same filtered set.
+  const [view, setView] = React.useState<"list" | "map">("list")
 
   React.useEffect(() => {
     const t = setTimeout(() => setAuthor(authorInput.trim() || null), SEARCH_DEBOUNCE_MS)
@@ -48,11 +53,13 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
             <FilterChip key={c} label={c} active={category === c} onClick={() => setCategory(category === c ? null : c)} />
           ))}
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: spacing[3], flexWrap: "wrap" }}>
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
+            flex: "1 1 220px",
             maxWidth: 320,
             border: `1.4px solid ${colors.line}`,
             borderRadius: radii.md,
@@ -90,6 +97,42 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
               <X size={13} />
             </button>
           )}
+        </div>
+
+        {/* List / Map view toggle */}
+        <div
+          role="group"
+          aria-label="View"
+          style={{ display: "inline-flex", alignItems: "center", gap: 2, background: colors.line, borderRadius: radii.pill, padding: 2 }}
+        >
+          {(["list", "map"] as const).map((v) => {
+            const active = view === v
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                aria-pressed={active}
+                style={{
+                  fontFamily: fonts.mono,
+                  fontSize: fontSize.label,
+                  fontWeight: fontWeight.semibold,
+                  padding: `${spacing[1]}px ${spacing[3]}px`,
+                  borderRadius: radii.pill,
+                  border: "none",
+                  cursor: "pointer",
+                  letterSpacing: "0.05em",
+                  lineHeight: 1.4,
+                  background: active ? colors.violet : "transparent",
+                  color: active ? colors.onDark : colors.mutedSoft,
+                  textTransform: "uppercase",
+                }}
+              >
+                {v === "list" ? "List" : "Map"}
+              </button>
+            )
+          })}
+        </div>
         </div>
       </div>
 
@@ -141,6 +184,14 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
               "No updates yet. Be the first to post one."
             )}
           </div>
+        ) : view === "map" ? (
+          <ShipsPlot
+            posts={posts.slice(0, MAP_WINDOW)}
+            cheerCounts={cheerCounts}
+            mineCheers={mineCheers}
+            userId={userId}
+            onCheer={async (id) => { await toggleCheer(id) }}
+          />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
             {posts.map((p) => {
@@ -170,7 +221,7 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
           </div>
         )}
 
-        {!loading && hasMore && (
+        {!loading && hasMore && view === "list" && (
           <div style={{ textAlign: "center", marginTop: spacing[4] }}>
             <button
               type="button"
