@@ -40,6 +40,8 @@ const REFETCH_DEBOUNCE_MS = 500
 /** Max ids per `.in(...)` filter, to keep request URLs within limits. */
 const IN_CHUNK = 150
 
+// profiles is an inner join (author_id is NOT NULL with an FK, so it never
+// drops rows) — inner is what lets the author-name filter run server-side.
 const POST_SELECT = `
   id,
   author_id,
@@ -52,7 +54,7 @@ const POST_SELECT = `
   media_url,
   media_type,
   media_name,
-  profiles:author_id ( name, avatar_url ),
+  profiles:author_id!inner ( name, avatar_url ),
   projects:project_id ( name )
 ` as const
 
@@ -95,8 +97,21 @@ function startOfUtcDayISO(): string {
  *   never truncates them.
  * - Realtime refetches are debounced so a burst of cheers is one refetch, not
  *   one per event.
+ * - Filters (category / author name) run server-side on the browse feed, so
+ *   they stay truthful across pagination instead of filtering one loaded page.
  */
-export function useBuildLog(eventId?: string | null) {
+export interface BuildLogFilter {
+  /** Exact work category, or null for all. */
+  category?: string | null
+  /** Case-insensitive author-name fragment, or null for everyone. */
+  author?: string | null
+}
+
+export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
+  // Primitive deps so callers can pass a fresh object literal each render.
+  const filterCategory = filter?.category ?? null
+  const filterAuthor = filter?.author?.trim() || null
+
   const [posts, setPosts] = useState<BuildLogRow[]>([])
   const [todayPosts, setTodayPosts] = useState<BuildLogRow[]>([])
   const [myPostDates, setMyPostDates] = useState<string[]>([])
@@ -107,6 +122,11 @@ export function useBuildLog(eventId?: string | null) {
   const [limit, setLimit] = useState(BUILD_LOG_PAGE)
   const [hasMore, setHasMore] = useState(false)
 
+  // A new filter restarts pagination at page one.
+  useEffect(() => {
+    setLimit(BUILD_LOG_PAGE)
+  }, [filterCategory, filterAuthor])
+
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
 
@@ -114,13 +134,16 @@ export function useBuildLog(eventId?: string | null) {
     const uid = user?.id ?? null
     setUserId(uid)
 
-    // Browse feed: newest-first, bounded by the current page size.
+    // Browse feed: newest-first, bounded by the current page size. Filters
+    // apply here only — todayPosts (spotlight) and streak dates stay unfiltered.
     let pageQuery = supabase
       .from("build_log")
       .select(POST_SELECT)
       .order("created_at", { ascending: false })
       .limit(limit)
     if (eventId) pageQuery = pageQuery.eq("event_id", eventId)
+    if (filterCategory) pageQuery = pageQuery.eq("category", filterCategory)
+    if (filterAuthor) pageQuery = pageQuery.ilike("profiles.name", `%${filterAuthor}%`)
 
     // Today's ships (spotlight + counter): bounded to one UTC day, not the page.
     let todayQuery = supabase
@@ -184,7 +207,7 @@ export function useBuildLog(eventId?: string | null) {
     setCheerCounts(counts)
     setMineCheers(mine)
     setLoading(false)
-  }, [eventId, limit])
+  }, [eventId, limit, filterCategory, filterAuthor])
 
   // Keep the refetch pointing at the latest fetch (which closes over eventId +
   // limit) without re-subscribing the broadcast channel each time those change.

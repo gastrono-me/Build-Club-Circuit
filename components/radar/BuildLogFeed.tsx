@@ -1,16 +1,34 @@
 "use client"
 
 import React from "react"
+import { Search, X } from "lucide-react"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { useSpotlightNominations } from "@/lib/hooks/useSpotlightNominations"
+import { WORK_CATEGORIES } from "@/lib/data/work-categories"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
 import { SectionTitle } from "@/components/ui/SectionTitle"
-import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/design/tokens"
+import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
+
+/** Debounce for the builder-name search, so typing doesn't fire a query per key. */
+const SEARCH_DEBOUNCE_MS = 300
 
 export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | null; compose?: boolean } = {}) {
-  const { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId)
+  // Filters: category chip + builder-name search, both applied server-side.
+  const [category, setCategory] = React.useState<string | null>(null)
+  const [authorInput, setAuthorInput] = React.useState("")
+  const [author, setAuthor] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setAuthor(authorInput.trim() || null), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [authorInput])
+
+  const { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId, { category, author })
   const { mine: nominated, nominate, unnominate } = useSpotlightNominations()
+
+  const filtering = !!category || !!author
+  const clearFilters = () => { setCategory(null); setAuthorInput(""); setAuthor(null) }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: spacing[6] }}>
@@ -21,6 +39,59 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
       />
 
       {compose && <PostUpdate onPost={post} />}
+
+      {/* Filters: work category + builder name */}
+      <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: spacing[2] }}>
+          <FilterChip label="All" active={!category} onClick={() => setCategory(null)} />
+          {WORK_CATEGORIES.map((c) => (
+            <FilterChip key={c} label={c} active={category === c} onClick={() => setCategory(category === c ? null : c)} />
+          ))}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            maxWidth: 320,
+            border: `1.4px solid ${colors.line}`,
+            borderRadius: radii.md,
+            padding: "0 12px",
+            background: colors.panel,
+            transition: `border-color ${motion.fast} ${motion.ease}`,
+          }}
+          onFocusCapture={(e) => { e.currentTarget.style.borderColor = colors.violet }}
+          onBlurCapture={(e) => { e.currentTarget.style.borderColor = colors.line }}
+        >
+          <Search size={14} color={colors.mutedSoft} style={{ flexShrink: 0 }} />
+          <input
+            value={authorInput}
+            onChange={(e) => setAuthorInput(e.target.value)}
+            placeholder="Filter by builder name"
+            aria-label="Filter by builder name"
+            style={{
+              flex: 1,
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              color: colors.ink,
+              fontFamily: fonts.body,
+              fontSize: fontSize.meta,
+              padding: "9px 0",
+            }}
+          />
+          {authorInput && (
+            <button
+              type="button"
+              onClick={() => setAuthorInput("")}
+              aria-label="Clear builder filter"
+              style={{ border: "none", background: "transparent", color: colors.muted, cursor: "pointer", display: "flex", padding: 2, flexShrink: 0 }}
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+      </div>
 
       <section aria-label="All updates">
         {loading ? (
@@ -46,7 +117,29 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
               padding: `${spacing[8]}px 0`,
             }}
           >
-            No updates yet. Be the first to post one.
+            {filtering ? (
+              <>
+                No ships match these filters.{" "}
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: colors.violet,
+                    fontFamily: fonts.body,
+                    fontSize: fontSize.body,
+                    cursor: "pointer",
+                    padding: 0,
+                    textDecoration: "underline",
+                  }}
+                >
+                  Clear filters
+                </button>
+              </>
+            ) : (
+              "No updates yet. Be the first to post one."
+            )}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
@@ -101,6 +194,32 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
         )}
       </section>
     </div>
+  )
+}
+
+/** A small toggleable category pill. */
+function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      style={{
+        padding: "4px 11px",
+        borderRadius: radii.pill,
+        border: `1.4px solid ${active ? colors.violet : colors.line}`,
+        background: active ? colors.violetSoft : colors.panel,
+        color: active ? colors.violet : colors.muted,
+        fontFamily: fonts.mono,
+        fontSize: fontSize.label,
+        fontWeight: active ? fontWeight.semibold : fontWeight.regular,
+        letterSpacing: "0.03em",
+        cursor: "pointer",
+        transition: `background ${motion.fast} ${motion.ease}, border-color ${motion.fast} ${motion.ease}, color ${motion.fast} ${motion.ease}`,
+      }}
+    >
+      {label}
+    </button>
   )
 }
 
