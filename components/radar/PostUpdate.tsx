@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from "react"
 import { Paperclip, Link2, X } from "lucide-react"
-import { BLOCKER_TAGS } from "@/types/index"
+import { SHIP_CATEGORIES } from "@/types/index"
 import { Button } from "@/components/ui/Button"
 import { useProjects } from "@/lib/hooks/useProjects"
 import { uploadShipMedia, normalizeLink, type ShipMedia } from "@/lib/storage/shipMedia"
@@ -18,7 +18,7 @@ interface PostUpdateProps {
 }
 
 export function PostUpdate({ onPost }: PostUpdateProps) {
-  const [category, setCategory] = useState<string>(BLOCKER_TAGS[0])
+  const [category, setCategory] = useState<string>(SHIP_CATEGORIES[0])
   const [note, setNote] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -160,7 +160,7 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
           onFocus={(e) => { e.currentTarget.style.borderColor = colors.violet }}
           onBlur={(e) => { e.currentTarget.style.borderColor = colors.line }}
         >
-          {BLOCKER_TAGS.map((tag) => (
+          {SHIP_CATEGORIES.map((tag) => (
             <option key={tag} value={tag}>{tag}</option>
           ))}
         </select>
