@@ -2,23 +2,25 @@
 
 import React from "react"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
+import { useSpotlightNominations } from "@/lib/hooks/useSpotlightNominations"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
 import { SectionTitle } from "@/components/ui/SectionTitle"
 import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/design/tokens"
 
-export function BuildLogFeed({ eventId }: { eventId?: string | null } = {}) {
+export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | null; compose?: boolean } = {}) {
   const { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId)
+  const { mine: nominated, nominate, unnominate } = useSpotlightNominations()
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: spacing[6] }}>
       <SectionTitle
         kicker="Build log"
         title="What's shipping"
-        note="Post a quick update when something starts working. Cheer the ones that made your day."
+        note="Every ship the cohort has logged. Cheer the ones that made your day."
       />
 
-      <PostUpdate onPost={post} />
+      {compose && <PostUpdate onPost={post} />}
 
       <section aria-label="All updates">
         {loading ? (
@@ -48,17 +50,29 @@ export function BuildLogFeed({ eventId }: { eventId?: string | null } = {}) {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
-            {posts.map((p) => (
-              <BuildLogCard
-                key={p.id}
-                post={p}
-                cheerCount={cheerCounts[p.id] ?? 0}
-                isMine={mineCheers.has(p.id)}
-                isOwn={!!userId && p.author_id === userId}
-                currentUserId={userId}
-                onCheer={() => toggleCheer(p.id)}
-              />
-            ))}
+            {posts.map((p) => {
+              const isOwn = !!userId && p.author_id === userId
+              return (
+                <BuildLogCard
+                  key={p.id}
+                  post={p}
+                  cheerCount={cheerCounts[p.id] ?? 0}
+                  isMine={mineCheers.has(p.id)}
+                  isOwn={isOwn}
+                  currentUserId={userId}
+                  onCheer={() => toggleCheer(p.id)}
+                  isNominated={nominated.has(p.id)}
+                  onToggleNominate={
+                    isOwn
+                      ? () =>
+                          (nominated.has(p.id) ? unnominate(p.id) : nominate(p.id)).catch((err) =>
+                            console.error("[spotlight] nominate toggle failed:", err),
+                          )
+                      : undefined
+                  }
+                />
+              )
+            })}
           </div>
         )}
 

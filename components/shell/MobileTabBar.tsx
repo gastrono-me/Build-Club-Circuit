@@ -3,7 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, FolderGit2, Activity, Users, type LucideIcon } from "lucide-react"
+import { Home, FolderGit2, Compass, Users, type LucideIcon } from "lucide-react"
 import { isActivePath } from "@/lib/nav"
 import { colors, fonts, fontSize, fontWeight, spacing } from "@/lib/design/tokens"
 
@@ -11,7 +11,7 @@ import { colors, fonts, fontSize, fontWeight, spacing } from "@/lib/design/token
 const TABS: { label: string; href: string; Icon: LucideIcon }[] = [
   { label: "Today", href: "/home", Icon: Home },
   { label: "Projects", href: "/projects", Icon: FolderGit2 },
-  { label: "Radar", href: "/radar", Icon: Activity },
+  { label: "Explore", href: "/explore", Icon: Compass },
   { label: "People", href: "/people", Icon: Users },
 ]
 

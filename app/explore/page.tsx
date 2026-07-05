@@ -5,7 +5,7 @@ import { useProfile } from "@/lib/hooks/useProfile"
 import { RadarFeed } from "@/components/radar/RadarFeed"
 import { colors, spacing } from "@/lib/design/tokens"
 
-export default function RadarPage() {
+export default function ExplorePage() {
   const { loading } = useProfile()
 
   if (loading) {
@@ -31,7 +31,8 @@ export default function RadarPage() {
       }}
     >
       <div style={{ maxWidth: 760, margin: "0 auto", paddingBottom: spacing[12] }}>
-        <RadarFeed />
+        {/* Browse-only: composing (ship + stuck) happens on Today. */}
+        <RadarFeed compose={false} />
       </div>
     </div>
   )

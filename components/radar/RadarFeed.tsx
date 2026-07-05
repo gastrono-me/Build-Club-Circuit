@@ -10,7 +10,7 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing, letterSpacing } fr
 
 type FeedTab = "stuck" | "shipped"
 
-export function RadarFeed({ eventId }: { eventId?: string | null } = {}) {
+export function RadarFeed({ eventId, compose = true }: { eventId?: string | null; compose?: boolean } = {}) {
   const [tab, setTab] = React.useState<FeedTab>("stuck")
   const { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore } = useRadar(eventId)
   // Your just-posted blocker (id-stable, set from post()'s returned id).
@@ -98,7 +98,7 @@ export function RadarFeed({ eventId }: { eventId?: string | null } = {}) {
         })}
       </div>
 
-      {tab === "shipped" && <BuildLogFeed eventId={eventId} />}
+      {tab === "shipped" && <BuildLogFeed eventId={eventId} compose={compose} />}
 
       {tab === "stuck" && (
         <>
@@ -170,8 +170,8 @@ export function RadarFeed({ eventId }: { eventId?: string | null } = {}) {
         pulseId={pulseId}
       />
 
-      {/* Post blocker composer */}
-      <PostBlocker onPost={handlePost} />
+      {/* Post blocker composer (Today owns "I'm stuck"; hidden on the browse-only Explore) */}
+      {compose && <PostBlocker onPost={handlePost} />}
 
       {/* Compact blocker list */}
       <section aria-label="All blockers">

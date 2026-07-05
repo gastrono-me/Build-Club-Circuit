@@ -2,7 +2,7 @@ import {
   Home,
   Users,
   CalendarRange,
-  Activity,
+  Compass,
   Mic,
   FolderGit2,
   type LucideIcon,
@@ -30,10 +30,13 @@ export function isActivePath(pathname: string, href: string): boolean {
 
 /**
  * Circuit's navigation, grouped by the evergreen model:
- *  - "Your build" — the daily loop (the spine): ship, projects, blockers, pitch.
- *  - "Community"  — the always-on graph plus events as first-class episodes.
+ *  - "Your build" — the daily loop (the spine): ship today, projects, pitch.
+ *  - "Community"  — the always-on graph: browse everyone's ships + blockers,
+ *    people, and events.
  *
- * Everything is always listed (no mode gate) so nothing is hidden.
+ * Today is strictly today (ship + get unstuck); Explore is the archive where
+ * all past ships and blockers live, browsable. Everything is always listed
+ * (no mode gate) so nothing is hidden.
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -41,13 +44,13 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Today", href: "/home", Icon: Home },
       { label: "Projects", href: "/projects", Icon: FolderGit2 },
-      { label: "Radar", href: "/radar", Icon: Activity },
       { label: "Pitch Coach", href: "/pitch", Icon: Mic },
     ],
   },
   {
     label: "Community",
     items: [
+      { label: "Explore", href: "/explore", Icon: Compass },
       { label: "People", href: "/people", Icon: Users },
       { label: "Events", href: "/events", Icon: CalendarRange },
     ],

@@ -1,15 +1,16 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
-import { Flame, Check } from "lucide-react"
+import Link from "next/link"
+import { Flame, Check, LifeBuoy, ArrowRight } from "lucide-react"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { useProfile } from "@/lib/hooks/useProfile"
+import { usePostBlocker } from "@/lib/hooks/usePostBlocker"
 import { computeStreak } from "@/lib/streak/streak"
 import { PostUpdate } from "@/components/radar/PostUpdate"
-import { BuildLogCard } from "@/components/radar/BuildLogCard"
+import { PostBlocker } from "@/components/radar/PostBlocker"
 import { SpotlightRail } from "@/components/spotlight/SpotlightRail"
 import { MyProjectsStrip } from "@/components/projects/MyProjectsStrip"
-import { useSpotlightNominations } from "@/lib/hooks/useSpotlightNominations"
 import { useSocial } from "@/components/shell/SocialProvider"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
 
@@ -22,10 +23,13 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/
  * calendar days.
  */
 export function TodayView() {
-  const { posts, todayPosts, myPostDates, loading, post, toggleCheer, cheerCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog()
+  const { todayPosts, myPostDates, post, toggleCheer, cheerCounts, mineCheers, userId } = useBuildLog()
   const { profile } = useProfile()
-  const { mine: nominated, nominate, unnominate } = useSpotlightNominations()
   const { openPanel } = useSocial()
+
+  // Compose-only blocker post ("I'm stuck"). Browsing blockers lives on Explore.
+  const postBlocker = usePostBlocker()
+  const [stuckOpen, setStuckOpen] = useState(false)
 
   // Resolve "now" on the client only, to keep streak math real-time without a
   // server/client hydration mismatch.
@@ -39,12 +43,10 @@ export function TodayView() {
     return computeStreak(userId ? myPostDates : [], now)
   }, [myPostDates, userId, now])
 
-  // The feed shows earlier ships only — today's are already featured in the
-  // Spotlight above, so the two sections don't duplicate each other.
-  const earlierPosts = useMemo(() => {
-    const todayIds = new Set(todayPosts.map((p) => p.id))
-    return posts.filter((p) => !todayIds.has(p.id))
-  }, [posts, todayPosts])
+  async function handleStuck(category: string, note: string) {
+    await postBlocker(category, note)
+    setStuckOpen(false)
+  }
 
   const greeting = useMemo(() => greetFor(now), [now])
   const firstName = profile?.name?.trim().split(/\s+/)[0]
@@ -118,115 +120,72 @@ export function TodayView() {
             : "Log one thing you got working today to keep your streak alive."}
         </p>
         <PostUpdate onPost={post} />
+
+        {/* Stuck action — being stuck is a "today" feeling; browsing blockers is on Explore */}
+        {stuckOpen ? (
+          <div style={{ marginTop: spacing[3] }}>
+            <PostBlocker onPost={handleStuck} />
+            <div style={{ textAlign: "center", marginTop: spacing[2] }}>
+              <button type="button" onClick={() => setStuckOpen(false)} style={stuckLinkStyle}>
+                Never mind
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setStuckOpen(true)} style={{ ...stuckLinkStyle, marginTop: spacing[3] }}>
+            <LifeBuoy size={14} /> Stuck on something? Post a blocker
+          </button>
+        )}
       </div>
 
       {/* What you're building — ships ladder into projects */}
       {now && <MyProjectsStrip now={now} />}
 
-      {/* Spotlight: who shipped today */}
+      {/* Shipped today — the day's cohort activity. History lives on Explore. */}
       {now && (
-        <SpotlightRail
-          posts={todayPosts}
-          now={now}
-          interactive
-          currentUserId={userId}
-          cheerCounts={cheerCounts}
-          mineCheers={mineCheers}
-          onCheer={toggleCheer}
-          onMessage={(p) =>
-            openPanel(
-              { id: p.author_id, name: p.author_name ?? "Builder", avatar: p.author_avatar },
-              "chat",
-            )
-          }
-        />
+        todayPosts.length > 0 ? (
+          <SpotlightRail
+            posts={todayPosts}
+            now={now}
+            interactive
+            currentUserId={userId}
+            cheerCounts={cheerCounts}
+            mineCheers={mineCheers}
+            onCheer={toggleCheer}
+            onMessage={(p) =>
+              openPanel(
+                { id: p.author_id, name: p.author_name ?? "Builder", avatar: p.author_avatar },
+                "chat",
+              )
+            }
+          />
+        ) : (
+          <div
+            style={{
+              background: colors.panel,
+              border: `1px dashed ${colors.line}`,
+              borderRadius: radii.xl,
+              padding: `${spacing[6]}px ${spacing[4]}px`,
+              textAlign: "center",
+              marginBottom: spacing[6],
+            }}
+          >
+            <div style={{ fontFamily: fonts.body, fontSize: fontSize.body, color: colors.muted }}>
+              No ships logged today yet.
+            </div>
+            <div style={{ fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.mutedSoft, marginTop: spacing[1] }}>
+              Be the first to ship, or see what the cohort has built before.
+            </div>
+          </div>
+        )
       )}
 
-      {/* Community feed — earlier ships (today's live in the Spotlight above) */}
-      <section aria-label="Earlier ships">
-        <div
-          style={{
-            fontFamily: fonts.mono,
-            fontSize: fontSize.label,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: colors.muted,
-            marginBottom: spacing[3],
-          }}
-        >
-          Earlier ships
-        </div>
-
-        {loading ? (
-          <div
-            style={{
-              fontFamily: fonts.mono,
-              fontSize: fontSize.label,
-              color: colors.mutedSoft,
-              letterSpacing: "0.06em",
-              textAlign: "center",
-              padding: `${spacing[8]}px 0`,
-            }}
-          >
-            Loading…
-          </div>
-        ) : posts.length === 0 ? (
-          <div
-            style={{
-              fontFamily: fonts.body,
-              fontSize: fontSize.body,
-              color: colors.muted,
-              textAlign: "center",
-              padding: `${spacing[8]}px 0`,
-            }}
-          >
-            No ships yet. Be the first to log one.
-          </div>
-        ) : earlierPosts.length === 0 ? (
-          <div
-            style={{
-              fontFamily: fonts.body,
-              fontSize: fontSize.meta,
-              color: colors.mutedSoft,
-              textAlign: "center",
-              padding: `${spacing[6]}px 0`,
-            }}
-          >
-            Just today&rsquo;s ships so far. Earlier ones will show here.
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
-            {earlierPosts.map((p) => (
-              <BuildLogCard
-                key={p.id}
-                post={p}
-                cheerCount={cheerCounts[p.id] ?? 0}
-                isMine={mineCheers.has(p.id)}
-                isOwn={!!userId && p.author_id === userId}
-                currentUserId={userId}
-                onCheer={() => toggleCheer(p.id)}
-                isNominated={nominated.has(p.id)}
-                onToggleNominate={
-                  !!userId && p.author_id === userId
-                    ? () =>
-                        (nominated.has(p.id) ? unnominate(p.id) : nominate(p.id)).catch((err) =>
-                          console.error("[spotlight] nominate toggle failed:", err),
-                        )
-                    : undefined
-                }
-              />
-            ))}
-          </div>
-        )}
-
-        {!loading && hasMore && (
-          <div style={{ textAlign: "center", marginTop: spacing[4] }}>
-            <button type="button" onClick={loadMore} style={loadMoreStyle}>
-              Load more
-            </button>
-          </div>
-        )}
-      </section>
+      {/* Everything older lives in the archive */}
+      <div style={{ textAlign: "center" }}>
+        <Link href="/explore" style={seeAllStyle}>
+          Explore all ships and blockers <ArrowRight size={14} />
+        </Link>
+      </div>
     </div>
   )
 }
@@ -284,18 +243,31 @@ function StreakRow({ streak }: { streak: ReturnType<typeof computeStreak> | null
   )
 }
 
-const loadMoreStyle: React.CSSProperties = {
+/** The quiet "Stuck?" toggle under the ship composer. */
+const stuckLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  color: colors.muted,
+  fontFamily: fonts.mono,
+  fontSize: fontSize.label,
+  letterSpacing: "0.03em",
+}
+
+/** Link into the archive from the bottom of Today. */
+const seeAllStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  textDecoration: "none",
+  color: colors.violet,
   fontFamily: fonts.mono,
   fontSize: fontSize.label,
   fontWeight: fontWeight.semibold,
-  letterSpacing: "0.05em",
-  textTransform: "uppercase",
-  color: colors.ink,
-  background: "transparent",
-  border: `1.5px solid ${colors.ink}`,
-  borderRadius: radii.md,
-  padding: `${spacing[2]}px ${spacing[4]}px`,
-  cursor: "pointer",
+  letterSpacing: "0.04em",
 }
 
 function greetFor(now: Date | null): string {

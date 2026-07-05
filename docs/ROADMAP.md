@@ -18,7 +18,7 @@ State today: a working, deployed app (Next.js + Supabase) with real auth/profile
 - **Fraunces optical sizing** depends on the variable-font axis being loaded by `next/font`; verify the display type sizes optically.
 
 ## Verifying the hero (the one thing worth checking live)
-Sign in as two users (two browsers or one + incognito), open `/radar` in both, post a blocker in one and tap "me too" in the other — the node and count update live in both via Supabase Realtime. This is the demo centrepiece and the proof the database/realtime path works.
+Sign in as two users (two browsers or one + incognito), open `/explore` (the "Stuck" tab) in both, post a blocker from Today in one and tap "me too" in the other — the node and count update live in both via Supabase Realtime. This is the demo centrepiece and the proof the database/realtime path works.
 
 ## Deploy
 `vercel --prod` from the repo (CLI, not Git integration). Ensure `vercel.json` keeps `framework: nextjs`, the two `NEXT_PUBLIC_SUPABASE_*` env vars are set in Vercel, and the deployed URL is in Supabase's auth redirect allow-list. See `CLAUDE.md` → "Deploy gotchas".
