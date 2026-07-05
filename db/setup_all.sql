@@ -697,6 +697,21 @@ alter table public.projects
 
 
 -- ─────────────────────────────────────────────────────────
+-- db/migrations/019_project_links_array.sql
+-- ─────────────────────────────────────────────────────────
+-- 019 project links: several links per project (text[]), replacing link_url.
+alter table public.projects
+  add column if not exists links text[] not null default '{}';
+
+update public.projects
+  set links = array[link_url]
+  where link_url is not null and btrim(link_url) <> '' and links = '{}';
+
+alter table public.projects
+  drop column if exists link_url;
+
+
+-- ─────────────────────────────────────────────────────────
 -- db/seed.sql
 -- ─────────────────────────────────────────────────────────
 -- seed: a few starter blockers so the Radar feed is never empty (community/seed posts, no author)

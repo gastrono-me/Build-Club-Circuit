@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/Input"
 import { Avatar } from "@/components/shell/Avatar"
 import { Button } from "@/components/ui/Button"
 import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
+import { LinksEditor } from "@/components/projects/LinksEditor"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { normalizeLink } from "@/lib/storage/shipMedia"
 import { shipDate, shipDayHeading, shipClock, localDayKey } from "@/lib/time"
@@ -28,12 +29,22 @@ function hostLabel(url: string): string {
   }
 }
 
+/** Normalize each link (add https://), drop blanks, and de-duplicate. */
+function cleanLinks(raw: string[]): string[] {
+  const out: string[] = []
+  for (const r of raw) {
+    const v = normalizeLink(r)
+    if (v && !out.includes(v)) out.push(v)
+  }
+  return out
+}
+
 interface ProjectMeta {
   id: string
   owner_id: string
   name: string
   tagline: string | null
-  link_url: string | null
+  links: string[]
   industries: string[]
   tags: string[]
   created_at: string
@@ -75,7 +86,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState("")
   const [editTagline, setEditTagline] = useState("")
-  const [editLink, setEditLink] = useState("")
+  const [editLinks, setEditLinks] = useState<string[]>([])
   const [editIndustries, setEditIndustries] = useState<string[]>([])
   const [editTags, setEditTags] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
@@ -90,7 +101,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     const [projRes, shipRes] = await Promise.all([
       supabase
         .from("projects")
-        .select("id, owner_id, name, tagline, link_url, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
+        .select("id, owner_id, name, tagline, links, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
         .eq("id", projectId)
         .maybeSingle(),
       supabase
@@ -115,7 +126,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       owner_id: p.owner_id,
       name: p.name,
       tagline: p.tagline ?? null,
-      link_url: p.link_url ?? null,
+      links: p.links ?? [],
       industries: p.industries ?? [],
       tags: p.tags ?? [],
       created_at: p.created_at,
@@ -165,7 +176,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     if (!project) return
     setEditName(project.name)
     setEditTagline(project.tagline ?? "")
-    setEditLink(project.link_url ?? "")
+    setEditLinks(project.links.length ? project.links : [""])
     setEditIndustries(project.industries)
     setEditTags(project.tags)
     setSaveError(null)
@@ -183,7 +194,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       setSaveError("Give the project a name.")
       return
     }
-    const link = normalizeLink(editLink)
+    const links = cleanLinks(editLinks)
     setSaving(true)
     setSaveError(null)
     try {
@@ -192,7 +203,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         .update({
           name: editName.trim(),
           tagline: editTagline.trim() || null,
-          link_url: link,
+          links,
           industries: editIndustries,
           tags: editTags,
         })
@@ -202,7 +213,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         ...project,
         name: editName.trim(),
         tagline: editTagline.trim() || null,
-        link_url: link,
+        links,
         industries: editIndustries,
         tags: editTags,
       })
@@ -322,9 +333,10 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           )}
           <span>started {shipDate(project.created_at, now)}</span>
           <span style={{ color: colors.go }}>{ships.length}{hasMore ? "+" : ""} ship{ships.length === 1 ? "" : "s"}</span>
-          {project.link_url && (
+          {project.links.map((url) => (
             <a
-              href={project.link_url}
+              key={url}
+              href={url}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -343,9 +355,9 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                 whiteSpace: "nowrap",
               }}
             >
-              <ExternalLink size={12} style={{ flexShrink: 0 }} /> {hostLabel(project.link_url)}
+              <ExternalLink size={12} style={{ flexShrink: 0 }} /> {hostLabel(url)}
             </a>
-          )}
+          ))}
         </div>
 
         {/* Details: edit the project (owner) or show its labels */}
@@ -353,7 +365,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           <div style={{ marginTop: spacing[4], border: `1px solid ${colors.line}`, borderRadius: radii.lg, padding: spacing[4], display: "flex", flexDirection: "column", gap: spacing[3] }}>
             <Input label="Project name" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Project name" required />
             <Input label="Tagline (optional)" value={editTagline} onChange={(e) => setEditTagline(e.target.value)} placeholder="One line on what it is" />
-            <Input label="Link (optional)" value={editLink} onChange={(e) => setEditLink(e.target.value)} placeholder="Website, repo, or demo" inputMode="url" />
+            <LinksEditor links={editLinks} onChange={setEditLinks} />
             <ProjectLabelPicker industries={editIndustries} tags={editTags} onToggle={toggleEditLabel} />
             {saveError && (
               <p style={{ margin: 0, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.live }}>{saveError}</p>

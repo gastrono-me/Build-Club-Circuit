@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/Input"
 import { Card } from "@/components/ui/Card"
 import { Avatar } from "@/components/shell/Avatar"
 import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
+import { LinksEditor } from "@/components/projects/LinksEditor"
+import { normalizeLink } from "@/lib/storage/shipMedia"
 import { shipDate, shipTime } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/design/tokens"
 
@@ -19,6 +21,7 @@ export function ProjectsView() {
   const [formOpen, setFormOpen] = useState(false)
   const [name, setName] = useState("")
   const [tagline, setTagline] = useState("")
+  const [links, setLinks] = useState<string[]>([])
   const [industries, setIndustries] = useState<string[]>([])
   const [tags, setTags] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
@@ -34,9 +37,20 @@ export function ProjectsView() {
   function resetForm() {
     setName("")
     setTagline("")
+    setLinks([])
     setIndustries([])
     setTags([])
     setError(null)
+  }
+
+  /** Normalize each link, drop blanks, de-duplicate. */
+  function cleanLinks(raw: string[]): string[] {
+    const out: string[] = []
+    for (const r of raw) {
+      const v = normalizeLink(r)
+      if (v && !out.includes(v)) out.push(v)
+    }
+    return out
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -45,7 +59,7 @@ export function ProjectsView() {
     setBusy(true)
     setError(null)
     try {
-      await create(name, tagline, { industries, tags })
+      await create(name, tagline, { industries, tags }, cleanLinks(links))
       resetForm()
       setFormOpen(false)
     } catch (err: any) {
@@ -70,6 +84,7 @@ export function ProjectsView() {
             <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
               <Input label="Project name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Circuit mobile app" autoFocus required />
               <Input label="Tagline (optional)" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="One line on what it is" />
+              <LinksEditor links={links} onChange={setLinks} />
               <ProjectLabelPicker industries={industries} tags={tags} onToggle={toggleLabel} />
               {error && (
                 <p style={{ margin: 0, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.live }}>{error}</p>
@@ -185,7 +200,7 @@ function ProjectCard({ project, now }: { project: ProjectRow; now: Date }) {
           <span style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft }}>
             {project.last_ship ? `last ship ${shipTime(project.last_ship, now)}` : `started ${shipDate(project.created_at, now)}`}
           </span>
-          {project.link_url && (
+          {project.links.length > 0 && (
             <span
               title="Has a live link"
               style={{
