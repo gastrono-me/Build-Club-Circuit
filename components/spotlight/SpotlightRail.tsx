@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card"
 import { Tag } from "@/components/ui/Tag"
 import { selectSpotlight } from "@/lib/spotlight/rotation"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
+import { ShipComments } from "@/components/radar/ShipComments"
 import { shipTime } from "@/lib/time"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
@@ -25,6 +26,7 @@ export interface SpotlightRailProps {
   interactive?: boolean
   currentUserId?: string | null
   cheerCounts?: Record<string, number>
+  commentCounts?: Record<string, number>
   mineCheers?: Set<string>
   onCheer?: (postId: string) => void
   onMessage?: (post: BuildLogRow) => void
@@ -37,6 +39,7 @@ export function SpotlightRail({
   interactive = false,
   currentUserId = null,
   cheerCounts = {},
+  commentCounts = {},
   mineCheers,
   onCheer,
   onMessage,
@@ -154,7 +157,7 @@ export function SpotlightRail({
         <ShipAttachments post={featured} compact />
 
         {interactive && (
-          <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginTop: spacing[4] }}>
+          <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginTop: spacing[4], flexWrap: "wrap" }}>
             <button
               type="button"
               onClick={() => onCheer?.(featured.id)}
@@ -178,6 +181,7 @@ export function SpotlightRail({
                 <MessageCircle size={13} /> Message
               </button>
             )}
+            <ShipComments postId={featured.id} count={commentCounts[featured.id] ?? 0} currentUserId={currentUserId} />
           </div>
         )}
 

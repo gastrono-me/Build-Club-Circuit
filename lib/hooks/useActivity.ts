@@ -4,40 +4,44 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { subscribeFeed, BUILD_LOG_TOPIC } from "@/lib/realtime/feedBus"
 
-/** One notification: recent cheers on a single ship of mine, grouped. */
+/** One notification: recent cheers OR comments on a single ship of mine, grouped. */
 export interface ActivityRow {
+  kind: "cheer" | "comment"
   postId: string
+  /** Context line: the ship note for cheers, the latest comment body for comments. */
   note: string
-  /** Most recent cheerer, shown as the face + name. */
+  /** Most recent actor, shown as the face + name. */
   latestName: string | null
   latestAvatar: string | null
-  /** How many distinct cheerers in the fetched window. */
-  cheerCount: number
-  /** Timestamp of the most recent cheer. */
+  /** How many distinct reactions of this kind in the fetched window. */
+  count: number
+  /** Timestamp of the most recent one. */
   lastAt: string
-  /** Cheers newer than my read cursor. */
+  /** Reactions newer than my read cursor. */
   newCount: number
   unread: boolean
 }
 
-/** How many recent cheers to consider. Bounded so the query stays cheap. */
+/** How many recent reactions of each kind to consider. Bounded so the queries stay cheap. */
 const WINDOW = 80
-/** Coalesce bursts of cheers into a single refetch. */
+/** Coalesce bursts of reactions into a single refetch. */
 const REFETCH_DEBOUNCE_MS = 500
 
-interface CheerRow {
+interface ReactionRow {
   post_id: string
-  user_id: string
   created_at: string
+  /** Comment body; absent on cheers. */
+  body?: string
   build_log: { author_id: string; note: string } | null
   profiles: { name: string | null; avatar_url: string | null } | null
 }
 
 /**
- * "Who reacted to what I shipped." Reads cheers on my own build_log posts
- * (excluding my own cheers), grouped by post, and marks a group unread when it
- * has cheers newer than my activity_reads cursor. Lives on the shared build-log
- * broadcast topic, so a cheer anywhere pings a debounced refetch.
+ * "Who reacted to what I shipped." Reads cheers and comments on my own
+ * build_log posts (excluding my own), grouped per kind+post, and marks a group
+ * unread when it has reactions newer than my activity_reads cursor (one cursor
+ * covers both streams). Lives on the shared build-log broadcast topic, so a
+ * reaction anywhere pings a debounced refetch.
  */
 export function useActivity(): {
   activity: ActivityRow[]
@@ -61,12 +65,19 @@ export function useActivity(): {
       return
     }
 
-    const [cheerRes, readRes] = await Promise.all([
+    const [cheerRes, commentRes, readRes] = await Promise.all([
       supabase
         .from("build_log_cheers")
-        .select("post_id, user_id, created_at, build_log!inner ( author_id, note ), profiles:user_id ( name, avatar_url )")
+        .select("post_id, created_at, build_log!inner ( author_id, note ), profiles:user_id ( name, avatar_url )")
         .eq("build_log.author_id", me)
         .neq("user_id", me)
+        .order("created_at", { ascending: false })
+        .limit(WINDOW),
+      supabase
+        .from("ship_comments")
+        .select("post_id, created_at, body, build_log!inner ( author_id, note ), profiles:author_id ( name, avatar_url )")
+        .eq("build_log.author_id", me)
+        .neq("author_id", me)
         .order("created_at", { ascending: false })
         .limit(WINDOW),
       supabase
@@ -77,36 +88,43 @@ export function useActivity(): {
     ])
 
     if (cheerRes.error) console.error("[useActivity] cheers fetch error:", cheerRes.error)
+    if (commentRes.error) console.error("[useActivity] comments fetch error:", commentRes.error)
     if (readRes.error) console.error("[useActivity] read cursor fetch error:", readRes.error)
 
     const lastReadAt = (readRes.data as { last_read_at: string } | null)?.last_read_at
       ?? new Date(0).toISOString()
 
-    // Group cheers by post. Rows come newest-first, so the first per post is the
-    // most recent cheer on it.
+    // Group per kind+post. Rows come newest-first, so the first per group is
+    // the most recent reaction on it.
     const groups = new Map<string, ActivityRow>()
-    for (const c of (cheerRes.data ?? []) as unknown as CheerRow[]) {
-      const isNew = c.created_at > lastReadAt
-      const existing = groups.get(c.post_id)
-      if (existing) {
-        existing.cheerCount += 1
-        if (isNew) { existing.newCount += 1; existing.unread = true }
-      } else {
-        groups.set(c.post_id, {
-          postId: c.post_id,
-          note: c.build_log?.note ?? "your ship",
-          latestName: c.profiles?.name ?? null,
-          latestAvatar: c.profiles?.avatar_url ?? null,
-          cheerCount: 1,
-          lastAt: c.created_at,
-          newCount: isNew ? 1 : 0,
-          unread: isNew,
-        })
+    const fold = (kind: ActivityRow["kind"], rows: ReactionRow[]) => {
+      for (const r of rows) {
+        const isNew = r.created_at > lastReadAt
+        const key = `${kind}|${r.post_id}`
+        const existing = groups.get(key)
+        if (existing) {
+          existing.count += 1
+          if (isNew) { existing.newCount += 1; existing.unread = true }
+        } else {
+          groups.set(key, {
+            kind,
+            postId: r.post_id,
+            // Cheers show the ship they landed on; comments show what was said.
+            note: kind === "comment" ? (r.body ?? "") : (r.build_log?.note ?? "your ship"),
+            latestName: r.profiles?.name ?? null,
+            latestAvatar: r.profiles?.avatar_url ?? null,
+            count: 1,
+            lastAt: r.created_at,
+            newCount: isNew ? 1 : 0,
+            unread: isNew,
+          })
+        }
       }
     }
+    fold("cheer", (cheerRes.data ?? []) as unknown as ReactionRow[])
+    fold("comment", (commentRes.data ?? []) as unknown as ReactionRow[])
 
-    // Newest activity first (groups already inserted in that order via the map,
-    // but sort defensively on lastAt).
+    // Newest activity first across both kinds.
     setActivity([...groups.values()].sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1)))
     setLoading(false)
   }, [])

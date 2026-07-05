@@ -8,6 +8,7 @@ import { Avatar } from "@/components/shell/Avatar"
 import { FolderGit2, MessageCircle, Star } from "lucide-react"
 import { useSocial } from "@/components/shell/SocialProvider"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
+import { ShipComments } from "@/components/radar/ShipComments"
 import { shipTime } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
@@ -15,6 +16,7 @@ import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
 interface BuildLogCardProps {
   post: BuildLogRow
   cheerCount: number
+  commentCount?: number
   isMine: boolean
   isOwn: boolean // current user is the author
   currentUserId: string | null
@@ -34,6 +36,7 @@ function fullStamp(iso: string): string {
 export function BuildLogCard({
   post,
   cheerCount,
+  commentCount = 0,
   isMine,
   isOwn,
   currentUserId,
@@ -146,8 +149,8 @@ export function BuildLogCard({
       {/* Attachments (image / file / link) */}
       <ShipAttachments post={post} />
 
-      {/* Action row */}
-      <div style={{ display: "flex", alignItems: "center", gap: spacing[2] }}>
+      {/* Action row (wraps so an expanded comment thread takes the full width) */}
+      <div style={{ display: "flex", alignItems: "center", gap: spacing[2], flexWrap: "wrap" }}>
         {/* Cheer button — disabled for own posts */}
         <button
           type="button"
@@ -224,6 +227,9 @@ export function BuildLogCard({
             <Star size={13} /> {isNominated ? "Submitted for spotlight" : "Submit for a spotlight"}
           </button>
         )}
+
+        {/* Last in the row: its expanded thread wraps to the full width below */}
+        <ShipComments postId={post.id} count={commentCount} currentUserId={currentUserId} />
       </div>
     </Card>
   )

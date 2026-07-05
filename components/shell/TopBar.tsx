@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
 import { MobileMenu } from "@/components/shell/MobileMenu"
 import { Avatar } from "@/components/shell/Avatar"
-import { CatchupRequestRow, CheerNotificationRow, MessageRow } from "@/components/shell/NotificationItems"
+import { CatchupRequestRow, ActivityNotificationRow, MessageRow } from "@/components/shell/NotificationItems"
 import { useProfile } from "@/lib/hooks/useProfile"
 import { useSocial } from "@/components/shell/SocialProvider"
 import {
@@ -193,12 +193,13 @@ export function TopBar() {
             ))}
 
             {activity.map((a) => (
-              <CheerNotificationRow
-                key={`cheer-${a.postId}`}
+              <ActivityNotificationRow
+                key={`${a.kind}-${a.postId}`}
                 activity={a}
                 variant="dropdown"
                 onClick={() => {
-                  router.push("/home")
+                  // The archive holds every ship, however old the reaction target.
+                  router.push("/explore")
                   setOpen(false)
                 }}
               />

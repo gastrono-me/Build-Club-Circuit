@@ -79,8 +79,8 @@ export function CatchupRequestRow({
   )
 }
 
-/** A "someone cheered your ship" row, shared between the bell dropdown and the drawer. */
-export function CheerNotificationRow({
+/** A "someone cheered/commented on your ship" row, shared between the bell dropdown and the drawer. */
+export function ActivityNotificationRow({
   activity,
   variant,
   onClick,
@@ -90,12 +90,13 @@ export function CheerNotificationRow({
   onClick: () => void
 }) {
   const dropdown = variant === "dropdown"
-  const others = activity.cheerCount - 1
+  const others = activity.count - 1
   const who = activity.latestName ?? "A builder"
+  const verb = activity.kind === "comment" ? "commented on" : "cheered"
   const headline =
     others > 0
-      ? `${who} + ${others} other${others === 1 ? "" : "s"} cheered your ship`
-      : `${who} cheered your ship`
+      ? `${who} + ${others} other${others === 1 ? "" : "s"} ${verb} your ship`
+      : `${who} ${verb} your ship`
   return (
     <button
       onClick={onClick}
@@ -125,7 +126,7 @@ export function CheerNotificationRow({
             filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.25))",
           }}
         >
-          👏
+          {activity.kind === "comment" ? "💬" : "👏"}
         </span>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>

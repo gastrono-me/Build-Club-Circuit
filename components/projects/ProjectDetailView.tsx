@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button"
 import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
 import { LinksEditor } from "@/components/projects/LinksEditor"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
+import { ShipComments } from "@/components/radar/ShipComments"
 import { normalizeLink } from "@/lib/storage/shipMedia"
 import { shipDate, shipDayHeading, shipClock, localDayKey } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
@@ -75,6 +76,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [now] = useState(() => new Date())
   const [project, setProject] = useState<ProjectMeta | null>(null)
   const [ships, setShips] = useState<ShipRow[]>([])
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
   const [limit, setLimit] = useState(PAGE)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -148,6 +150,23 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     }))
     setShips(rows)
     setHasMore(rows.length >= limit)
+
+    // Comment counts for the loaded ships (one bounded query to the view).
+    if (rows.length) {
+      const { data: ccData, error: ccErr } = await supabase
+        .from("ship_comment_counts")
+        .select("post_id, comments")
+        .in("post_id", rows.map((r) => r.id))
+      if (ccErr) console.error("[project] comment counts fetch error:", ccErr)
+      const cc: Record<string, number> = {}
+      for (const row of (ccData ?? []) as { post_id: string; comments: number }[]) {
+        cc[row.post_id] = row.comments
+      }
+      setCommentCounts(cc)
+    } else {
+      setCommentCounts({})
+    }
+
     setLoading(false)
   }, [projectId, limit])
 
@@ -468,6 +487,9 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                       {s.note}
                     </p>
                     <ShipAttachments post={s} compact />
+                    <div style={{ marginTop: spacing[3] }}>
+                      <ShipComments postId={s.id} count={commentCounts[s.id] ?? 0} currentUserId={userId} />
+                    </div>
                   </article>
                 ))}
               </div>

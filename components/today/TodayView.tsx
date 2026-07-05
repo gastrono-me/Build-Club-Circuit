@@ -24,7 +24,7 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/
  */
 export function TodayView() {
   // browse:false — Today renders only today's ships; skip fetching the archive page.
-  const { todayPosts, myPostDates, post, toggleCheer, cheerCounts, mineCheers, userId } = useBuildLog(null, { browse: false })
+  const { todayPosts, myPostDates, post, toggleCheer, cheerCounts, commentCounts, mineCheers, userId } = useBuildLog(null, { browse: false })
   const { profile } = useProfile()
   const { openPanel } = useSocial()
 
@@ -151,6 +151,7 @@ export function TodayView() {
             interactive
             currentUserId={userId}
             cheerCounts={cheerCounts}
+            commentCounts={commentCounts}
             mineCheers={mineCheers}
             onCheer={toggleCheer}
             onMessage={(p) =>

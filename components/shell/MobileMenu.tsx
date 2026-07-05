@@ -8,7 +8,7 @@ import { colors, fonts, fontSize, fontWeight, spacing, radii, shadows, motion } 
 import { NAV_GROUPS, isActivePath, type NavItem } from "@/lib/nav"
 import { GroupLabel } from "@/components/shell/Nav"
 import { Avatar } from "@/components/shell/Avatar"
-import { CatchupRequestRow, CheerNotificationRow, MessageRow } from "@/components/shell/NotificationItems"
+import { CatchupRequestRow, ActivityNotificationRow, MessageRow } from "@/components/shell/NotificationItems"
 import { useProfile } from "@/lib/hooks/useProfile"
 import { useSocial } from "@/components/shell/SocialProvider"
 
@@ -238,12 +238,12 @@ export function MobileMenu() {
                 YOUR SHIPS
               </div>
               {activity.map((a) => (
-                <CheerNotificationRow
-                  key={a.postId}
+                <ActivityNotificationRow
+                  key={`${a.kind}-${a.postId}`}
                   activity={a}
                   variant="drawer"
                   onClick={() => {
-                    router.push("/home")
+                    router.push("/explore")
                     setOpen(false)
                   }}
                 />

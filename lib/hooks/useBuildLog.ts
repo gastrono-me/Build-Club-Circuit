@@ -123,6 +123,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
   const [todayPosts, setTodayPosts] = useState<BuildLogRow[]>([])
   const [myPostDates, setMyPostDates] = useState<string[]>([])
   const [cheerCounts, setCheerCounts] = useState<Record<string, number>>({})
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
   const [mineCheers, setMineCheers] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
@@ -192,19 +193,25 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
     // list is chunked so a busy event day can't blow the request URL length.
     const visibleIds = Array.from(new Set([...pagePosts, ...today].map((p) => p.id)))
     const counts: Record<string, number> = {}
+    const comments: Record<string, number> = {}
     const mine = new Set<string>()
 
     for (const ids of chunk(visibleIds, IN_CHUNK)) {
-      const [countRes, mineRes] = await Promise.all([
+      const [countRes, commentRes, mineRes] = await Promise.all([
         supabase.from("build_log_cheer_counts").select("post_id, cheers").in("post_id", ids),
+        supabase.from("ship_comment_counts").select("post_id, comments").in("post_id", ids),
         uid
           ? supabase.from("build_log_cheers").select("post_id").eq("user_id", uid).in("post_id", ids)
           : Promise.resolve({ data: [], error: null } as any),
       ])
       if (countRes.error) console.error("[useBuildLog] cheer counts fetch error:", countRes.error)
+      if (commentRes.error) console.error("[useBuildLog] comment counts fetch error:", commentRes.error)
       if (mineRes.error) console.error("[useBuildLog] my-cheers fetch error:", mineRes.error)
       for (const row of (countRes.data ?? []) as { post_id: string; cheers: number }[]) {
         counts[row.post_id] = row.cheers
+      }
+      for (const row of (commentRes.data ?? []) as { post_id: string; comments: number }[]) {
+        comments[row.post_id] = row.comments
       }
       for (const row of (mineRes.data ?? []) as { post_id: string }[]) {
         mine.add(row.post_id)
@@ -216,6 +223,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
     setTodayPosts(today)
     setMyPostDates(((myDatesRes.data ?? []) as { created_at: string }[]).map((r) => r.created_at))
     setCheerCounts(counts)
+    setCommentCounts(comments)
     setMineCheers(mine)
     setLoading(false)
   }, [eventId, limit, filterCategory, filterAuthor, browse])
@@ -303,6 +311,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
     post,
     toggleCheer,
     cheerCounts,
+    commentCounts,
     mineCheers,
     userId,
     loadMore,

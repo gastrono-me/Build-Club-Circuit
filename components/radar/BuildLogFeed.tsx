@@ -24,7 +24,7 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
     return () => clearTimeout(t)
   }, [authorInput])
 
-  const { posts, loading, post, toggleCheer, cheerCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId, { category, author })
+  const { posts, loading, post, toggleCheer, cheerCounts, commentCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId, { category, author })
   const { mine: nominated, nominate, unnominate } = useSpotlightNominations()
 
   const filtering = !!category || !!author
@@ -150,6 +150,7 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
                   key={p.id}
                   post={p}
                   cheerCount={cheerCounts[p.id] ?? 0}
+                  commentCount={commentCounts[p.id] ?? 0}
                   isMine={mineCheers.has(p.id)}
                   isOwn={isOwn}
                   currentUserId={userId}

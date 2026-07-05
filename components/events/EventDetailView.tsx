@@ -33,7 +33,7 @@ export function EventDetailView({ slug }: { slug: string }) {
 
   const railEventId = scope === "event" ? (event?.id ?? null) : null
   // browse:false — the rail only shows today's ships; RadarFeed below fetches its own feed.
-  const { todayPosts, cheerCounts, mineCheers, toggleCheer, userId } = useBuildLog(railEventId, { browse: false })
+  const { todayPosts, cheerCounts, commentCounts, mineCheers, toggleCheer, userId } = useBuildLog(railEventId, { browse: false })
   const { openPanel } = useSocial()
 
   if (loading || !now) {
@@ -200,6 +200,7 @@ export function EventDetailView({ slug }: { slug: string }) {
           interactive
           currentUserId={userId}
           cheerCounts={cheerCounts}
+          commentCounts={commentCounts}
           mineCheers={mineCheers}
           onCheer={toggleCheer}
           onMessage={(p) =>
