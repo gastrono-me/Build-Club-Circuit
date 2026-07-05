@@ -8,6 +8,7 @@ export interface ProjectRow {
   owner_id: string
   name: string
   tagline: string | null
+  link_url: string | null
   industries: string[]
   tags: string[]
   created_at: string
@@ -45,7 +46,7 @@ export function useProjects() {
     const [projRes, countRes] = await Promise.all([
       supabase
         .from("projects")
-        .select("id, owner_id, name, tagline, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
+        .select("id, owner_id, name, tagline, link_url, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
         .order("created_at", { ascending: false }),
       supabase.from("project_ship_counts").select("project_id, ships, last_ship"),
     ])
@@ -64,6 +65,7 @@ export function useProjects() {
         owner_id: p.owner_id,
         name: p.name,
         tagline: p.tagline ?? null,
+        link_url: p.link_url ?? null,
         industries: p.industries ?? [],
         tags: p.tags ?? [],
         created_at: p.created_at,
@@ -94,11 +96,11 @@ export function useProjects() {
         industries: labels?.industries ?? [],
         tags: labels?.tags ?? [],
       })
-      .select("id, owner_id, name, tagline, industries, tags, created_at")
+      .select("id, owner_id, name, tagline, link_url, industries, tags, created_at")
       .single()
     if (error) throw error
 
-    const row: ProjectRow = { ...(data as any), owner_name: null, owner_avatar: null, ships: 0, last_ship: null }
+    const row: ProjectRow = { ...(data as any), link_url: (data as any).link_url ?? null, owner_name: null, owner_avatar: null, ships: 0, last_ship: null }
     setProjects((prev) => [row, ...prev])
     return row
   }, [])

@@ -2,26 +2,38 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, FolderGit2, Trash2 } from "lucide-react"
+import { ArrowLeft, ExternalLink, FolderGit2, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { subscribeFeed, BUILD_LOG_TOPIC } from "@/lib/realtime/feedBus"
 import { SectionTitle } from "@/components/ui/SectionTitle"
 import { Tag } from "@/components/ui/Tag"
+import { Input } from "@/components/ui/Input"
 import { Avatar } from "@/components/shell/Avatar"
 import { Button } from "@/components/ui/Button"
 import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
+import { normalizeLink } from "@/lib/storage/shipMedia"
 import { shipDate, shipDayHeading, shipClock, localDayKey } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
 
 const PAGE = 50
+
+/** Short label for a link: its hostname without www, else the raw string. */
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "")
+  } catch {
+    return url
+  }
+}
 
 interface ProjectMeta {
   id: string
   owner_id: string
   name: string
   tagline: string | null
+  link_url: string | null
   industries: string[]
   tags: string[]
   created_at: string
@@ -59,11 +71,15 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [userId, setUserId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  // Owner label editing
+  // Owner editing: name, tagline, link, and labels together.
   const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState("")
+  const [editTagline, setEditTagline] = useState("")
+  const [editLink, setEditLink] = useState("")
   const [editIndustries, setEditIndustries] = useState<string[]>([])
   const [editTags, setEditTags] = useState<string[]>([])
-  const [savingLabels, setSavingLabels] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
@@ -74,7 +90,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     const [projRes, shipRes] = await Promise.all([
       supabase
         .from("projects")
-        .select("id, owner_id, name, tagline, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
+        .select("id, owner_id, name, tagline, link_url, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
         .eq("id", projectId)
         .maybeSingle(),
       supabase
@@ -99,6 +115,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       owner_id: p.owner_id,
       name: p.name,
       tagline: p.tagline ?? null,
+      link_url: p.link_url ?? null,
       industries: p.industries ?? [],
       tags: p.tags ?? [],
       created_at: p.created_at,
@@ -146,8 +163,12 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
 
   function startEdit() {
     if (!project) return
+    setEditName(project.name)
+    setEditTagline(project.tagline ?? "")
+    setEditLink(project.link_url ?? "")
     setEditIndustries(project.industries)
     setEditTags(project.tags)
+    setSaveError(null)
     setEditing(true)
   }
 
@@ -156,21 +177,41 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     set(get.includes(value) ? get.filter((v) => v !== value) : [...get, value])
   }
 
-  async function saveLabels() {
+  async function saveProject() {
     if (!project) return
-    setSavingLabels(true)
+    if (!editName.trim()) {
+      setSaveError("Give the project a name.")
+      return
+    }
+    const link = normalizeLink(editLink)
+    setSaving(true)
+    setSaveError(null)
     try {
       const { error } = await createClient()
         .from("projects")
-        .update({ industries: editIndustries, tags: editTags })
+        .update({
+          name: editName.trim(),
+          tagline: editTagline.trim() || null,
+          link_url: link,
+          industries: editIndustries,
+          tags: editTags,
+        })
         .eq("id", project.id)
       if (error) throw error
-      setProject({ ...project, industries: editIndustries, tags: editTags })
+      setProject({
+        ...project,
+        name: editName.trim(),
+        tagline: editTagline.trim() || null,
+        link_url: link,
+        industries: editIndustries,
+        tags: editTags,
+      })
       setEditing(false)
-    } catch (err) {
-      console.error("[project] label save failed:", err)
+    } catch (err: any) {
+      console.error("[project] save failed:", err)
+      setSaveError(err?.message ?? "Save failed")
     } finally {
-      setSavingLabels(false)
+      setSaving(false)
     }
   }
 
@@ -281,15 +322,45 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           )}
           <span>started {shipDate(project.created_at, now)}</span>
           <span style={{ color: colors.go }}>{ships.length}{hasMore ? "+" : ""} ship{ships.length === 1 ? "" : "s"}</span>
+          {project.link_url && (
+            <a
+              href={project.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "2px 9px",
+                borderRadius: radii.pill,
+                background: colors.violetSoft,
+                color: colors.violet,
+                textDecoration: "none",
+                letterSpacing: "0.02em",
+                maxWidth: 240,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <ExternalLink size={12} style={{ flexShrink: 0 }} /> {hostLabel(project.link_url)}
+            </a>
+          )}
         </div>
 
-        {/* Labels */}
+        {/* Details: edit the project (owner) or show its labels */}
         {editing ? (
-          <div style={{ marginTop: spacing[4], border: `1px solid ${colors.line}`, borderRadius: radii.lg, padding: spacing[4] }}>
+          <div style={{ marginTop: spacing[4], border: `1px solid ${colors.line}`, borderRadius: radii.lg, padding: spacing[4], display: "flex", flexDirection: "column", gap: spacing[3] }}>
+            <Input label="Project name" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Project name" required />
+            <Input label="Tagline (optional)" value={editTagline} onChange={(e) => setEditTagline(e.target.value)} placeholder="One line on what it is" />
+            <Input label="Link (optional)" value={editLink} onChange={(e) => setEditLink(e.target.value)} placeholder="Website, repo, or demo" inputMode="url" />
             <ProjectLabelPicker industries={editIndustries} tags={editTags} onToggle={toggleEditLabel} />
-            <div style={{ display: "flex", gap: spacing[2], marginTop: spacing[4] }}>
-              <Button variant="accent" size="sm" disabled={savingLabels} onClick={saveLabels}>
-                {savingLabels ? "Saving…" : "Save labels"}
+            {saveError && (
+              <p style={{ margin: 0, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.live }}>{saveError}</p>
+            )}
+            <div style={{ display: "flex", gap: spacing[2], marginTop: spacing[1] }}>
+              <Button variant="accent" size="sm" disabled={saving || !editName.trim()} onClick={saveProject}>
+                {saving ? "Saving…" : "Save changes"}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
             </div>
@@ -313,7 +384,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                     textTransform: "uppercase",
                   }}
                 >
-                  {project.industries.length || project.tags.length ? "Edit labels" : "+ Add labels"}
+                  Edit project
                 </button>
               )}
             </div>

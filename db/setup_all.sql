@@ -689,6 +689,14 @@ create policy activity_reads_all_own on public.activity_reads
 
 
 -- ─────────────────────────────────────────────────────────
+-- db/migrations/018_project_link.sql
+-- ─────────────────────────────────────────────────────────
+-- 018 project link: a project's primary URL (website, repo, or demo).
+alter table public.projects
+  add column if not exists link_url text;
+
+
+-- ─────────────────────────────────────────────────────────
 -- db/seed.sql
 -- ─────────────────────────────────────────────────────────
 -- seed: a few starter blockers so the Radar feed is never empty (community/seed posts, no author)

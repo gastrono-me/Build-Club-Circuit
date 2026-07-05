@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import Link from "next/link"
-import { FolderGit2, Plus } from "lucide-react"
+import { ExternalLink, FolderGit2, Plus } from "lucide-react"
 import { useProjects, type ProjectRow } from "@/lib/hooks/useProjects"
 import { SectionTitle } from "@/components/ui/SectionTitle"
 import { Button } from "@/components/ui/Button"
@@ -185,6 +185,24 @@ function ProjectCard({ project, now }: { project: ProjectRow; now: Date }) {
           <span style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft }}>
             {project.last_ship ? `last ship ${shipTime(project.last_ship, now)}` : `started ${shipDate(project.created_at, now)}`}
           </span>
+          {project.link_url && (
+            <span
+              title="Has a live link"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "2px 9px",
+                borderRadius: radii.pill,
+                background: colors.violetSoft,
+                color: colors.violet,
+                fontFamily: fonts.mono,
+                fontSize: fontSize.label,
+              }}
+            >
+              <ExternalLink size={11} /> site
+            </span>
+          )}
         </div>
         {project.owner_name && (
           <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginTop: spacing[3] }}>
