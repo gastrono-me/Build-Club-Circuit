@@ -8,21 +8,24 @@ import { WORK_CATEGORIES } from "@/lib/data/work-categories"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
 import { ShipsPlot } from "@/components/radar/ShipsPlot"
-import { SectionTitle } from "@/components/ui/SectionTitle"
-import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
+import { colors, fonts, fontSize, fontWeight, radii, spacing, motion, letterSpacing } from "@/lib/design/tokens"
 
 /** Debounce for the builder-name search, so typing doesn't fire a query per key. */
 const SEARCH_DEBOUNCE_MS = 300
-/** The map is a recent-energy lens, not the archive: cap the nodes it plots. */
-const MAP_WINDOW = 60
+/** The field is a recent-energy lens, not the archive: cap the nodes it plots. */
+const PLOT_WINDOW = 60
 
+/**
+ * The Shipped tab, structured as the mirror of the Stuck tab: display header,
+ * the embedding field as hero, composer (event pages only), then the filterable
+ * list. Same instrument, other polarity.
+ */
 export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | null; compose?: boolean } = {}) {
   // Filters: category chip + builder-name search, both applied server-side.
+  // They drive the field and the list together (same filtered set).
   const [category, setCategory] = React.useState<string | null>(null)
   const [authorInput, setAuthorInput] = React.useState("")
   const [author, setAuthor] = React.useState<string | null>(null)
-  // List is the workhorse; the map is a discovery lens over the same filtered set.
-  const [view, setView] = React.useState<"list" | "map">("list")
 
   React.useEffect(() => {
     const t = setTimeout(() => setAuthor(authorInput.trim() || null), SEARCH_DEBOUNCE_MS)
@@ -37,15 +40,75 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: spacing[6] }}>
-      <SectionTitle
-        kicker="Build log"
-        title="What's shipping"
-        note="Every ship the cohort has logged. Cheer the ones that made your day."
+      {/* Heading — mirrors the Stuck tab's */}
+      <header>
+        <h1
+          style={{
+            fontFamily: fonts.display,
+            fontWeight: fontWeight.semibold,
+            fontSize: "clamp(38px, 9vw, 60px)",
+            lineHeight: 0.96,
+            letterSpacing: "-0.035em",
+            margin: 0,
+            color: colors.ink,
+          }}
+        >
+          What the cohort is{" "}
+          <em style={{ fontStyle: "italic", color: colors.go }}>shipping</em>.
+        </h1>
+        <p
+          style={{
+            marginTop: spacing[3],
+            maxWidth: "46ch",
+            color: colors.muted,
+            fontSize: 15.5,
+            fontFamily: fonts.body,
+          }}
+        >
+          Every ship is a point in the field. Tap one to{" "}
+          <strong style={{ color: colors.ink, fontWeight: fontWeight.semibold }}>cheer</strong>{" "}
+          it or message the builder behind it.
+        </p>
+        {/* Live pulse indicator */}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            fontFamily: fonts.mono,
+            fontSize: fontSize.label,
+            color: colors.go,
+            letterSpacing: letterSpacing.label,
+            marginTop: spacing[2],
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: colors.go,
+              display: "inline-block",
+              animation: "radarPulse 2s ease-in-out infinite",
+            }}
+          />
+          LIVE
+        </div>
+      </header>
+
+      {/* Hero: the ship field (plots the filtered set, most recent first) */}
+      <ShipsPlot
+        posts={posts.slice(0, PLOT_WINDOW)}
+        cheerCounts={cheerCounts}
+        mineCheers={mineCheers}
+        userId={userId}
+        onCheer={async (id) => { await toggleCheer(id) }}
       />
 
       {compose && <PostUpdate onPost={post} />}
 
-      {/* Filters: work category + builder name */}
+      {/* Filters: work category + builder name (drive the field and the list) */}
       <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: spacing[2] }}>
           <FilterChip label="All" active={!category} onClick={() => setCategory(null)} />
@@ -53,13 +116,11 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
             <FilterChip key={c} label={c} active={category === c} onClick={() => setCategory(category === c ? null : c)} />
           ))}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: spacing[3], flexWrap: "wrap" }}>
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
-            flex: "1 1 220px",
             maxWidth: 320,
             border: `1.4px solid ${colors.line}`,
             borderRadius: radii.md,
@@ -98,45 +159,34 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
             </button>
           )}
         </div>
-
-        {/* List / Map view toggle */}
-        <div
-          role="group"
-          aria-label="View"
-          style={{ display: "inline-flex", alignItems: "center", gap: 2, background: colors.line, borderRadius: radii.pill, padding: 2 }}
-        >
-          {(["list", "map"] as const).map((v) => {
-            const active = view === v
-            return (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setView(v)}
-                aria-pressed={active}
-                style={{
-                  fontFamily: fonts.mono,
-                  fontSize: fontSize.label,
-                  fontWeight: fontWeight.semibold,
-                  padding: `${spacing[1]}px ${spacing[3]}px`,
-                  borderRadius: radii.pill,
-                  border: "none",
-                  cursor: "pointer",
-                  letterSpacing: "0.05em",
-                  lineHeight: 1.4,
-                  background: active ? colors.violet : "transparent",
-                  color: active ? colors.onDark : colors.mutedSoft,
-                  textTransform: "uppercase",
-                }}
-              >
-                {v === "list" ? "List" : "Map"}
-              </button>
-            )
-          })}
-        </div>
-        </div>
       </div>
 
-      <section aria-label="All updates">
+      {/* Compact ship list — mirrors "All blockers" */}
+      <section aria-label="All ships">
+        <div
+          style={{
+            fontFamily: fonts.mono,
+            fontSize: fontSize.label,
+            letterSpacing: letterSpacing.label,
+            textTransform: "uppercase",
+            color: colors.muted,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: spacing[3],
+          }}
+        >
+          <span aria-hidden style={{ color: colors.go, fontSize: 13, lineHeight: 1 }}>
+            →
+          </span>
+          All ships
+          {!loading && (
+            <span style={{ color: colors.mutedSoft, fontSize: fontSize.micro }}>
+              {posts.length}{hasMore ? "+" : ""}
+            </span>
+          )}
+        </div>
+
         {loading ? (
           <div
             style={{
@@ -181,17 +231,9 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
                 </button>
               </>
             ) : (
-              "No updates yet. Be the first to post one."
+              "No ships yet. Be the first to log one."
             )}
           </div>
-        ) : view === "map" ? (
-          <ShipsPlot
-            posts={posts.slice(0, MAP_WINDOW)}
-            cheerCounts={cheerCounts}
-            mineCheers={mineCheers}
-            userId={userId}
-            onCheer={async (id) => { await toggleCheer(id) }}
-          />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
             {posts.map((p) => {
@@ -221,7 +263,7 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
           </div>
         )}
 
-        {!loading && hasMore && view === "list" && (
+        {!loading && hasMore && (
           <div style={{ textAlign: "center", marginTop: spacing[4] }}>
             <button
               type="button"
