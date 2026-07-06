@@ -243,7 +243,7 @@ export function MobileMenu() {
                   activity={a}
                   variant="drawer"
                   onClick={() => {
-                    router.push("/explore")
+                    router.push(`/explore?ship=${a.postId}${a.kind === "comment" ? "&comments=1" : ""}`)
                     setOpen(false)
                   }}
                 />

@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/Card"
 import { Avatar } from "@/components/shell/Avatar"
 import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
 import { LinksEditor } from "@/components/projects/LinksEditor"
+import { SkeletonFeed } from "@/components/ui/Skeleton"
 import { normalizeLink } from "@/lib/storage/shipMedia"
 import { shipDate, shipTime } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/design/tokens"
@@ -105,9 +106,7 @@ export function ProjectsView() {
       </div>
 
       {loading ? (
-        <div style={{ fontFamily: fonts.mono, fontSize: fontSize.label, color: colors.mutedSoft, letterSpacing: "0.06em", textAlign: "center", padding: `${spacing[8]}px 0` }}>
-          Loading…
-        </div>
+        <SkeletonFeed count={2} label="Loading projects" />
       ) : (
         <>
           {mine.length > 0 && (

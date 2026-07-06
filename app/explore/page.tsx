@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { Suspense } from "react"
 import { useProfile } from "@/lib/hooks/useProfile"
 import { RadarFeed } from "@/components/radar/RadarFeed"
 import { colors, spacing } from "@/lib/design/tokens"
@@ -31,8 +31,12 @@ export default function ExplorePage() {
       }}
     >
       <div style={{ maxWidth: 760, margin: "0 auto", paddingBottom: spacing[12] }}>
-        {/* Browse-only: composing (ship + stuck) happens on Today. */}
-        <RadarFeed compose={false} />
+        {/* Browse-only: composing (ship + stuck) happens on Today. Suspense is
+            required because the feed reads useSearchParams (?ship= deep links)
+            on a statically rendered route. */}
+        <Suspense fallback={null}>
+          <RadarFeed compose={false} />
+        </Suspense>
       </div>
     </div>
   )

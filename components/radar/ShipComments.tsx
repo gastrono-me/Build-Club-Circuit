@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { MessageSquare } from "lucide-react"
+import { MessageSquare, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { subscribeFeed, notifyFeed, BUILD_LOG_TOPIC } from "@/lib/realtime/feedBus"
 import { Avatar } from "@/components/shell/Avatar"
@@ -27,13 +27,16 @@ export function ShipComments({
   postId,
   count,
   currentUserId,
+  defaultOpen = false,
 }: {
   postId: string
   /** Collapsed badge count, usually from the ship_comment_counts view. */
   count: number
   currentUserId: string | null
+  /** Start expanded (e.g. arriving from a comment notification). */
+  defaultOpen?: boolean
 }) {
-  const [open, setOpen] = React.useState(false)
+  const [open, setOpen] = React.useState(defaultOpen)
   const [comments, setComments] = React.useState<CommentRow[] | null>(null)
   const [body, setBody] = React.useState("")
   const [busy, setBusy] = React.useState(false)
@@ -66,6 +69,18 @@ export function ShipComments({
     fetchComments()
     return subscribeFeed(BUILD_LOG_TOPIC, fetchComments)
   }, [open, fetchComments])
+
+  async function removeComment(id: string) {
+    // Optimistic: drop it locally, then delete (RLS restricts to own comments).
+    setComments((prev) => prev?.filter((c) => c.id !== id) ?? prev)
+    const { error: err } = await createClient().from("ship_comments").delete().eq("id", id)
+    if (err) {
+      console.error("[comments] delete error:", err)
+      fetchComments() // restore truth
+      return
+    }
+    notifyFeed(BUILD_LOG_TOPIC)
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -117,7 +132,7 @@ export function ShipComments({
         }}
       >
         <MessageSquare size={13} />
-        {shown > 0 ? shown : "comment"}
+        {shown > 0 ? shown : "Comment"}
       </button>
 
       {open && (
@@ -147,6 +162,17 @@ export function ShipComments({
                     {c.body}
                   </p>
                 </div>
+                {currentUserId === c.author_id && (
+                  <button
+                    type="button"
+                    onClick={() => removeComment(c.id)}
+                    aria-label="Delete your comment"
+                    title="Delete your comment"
+                    style={{ border: "none", background: "transparent", color: colors.mutedSoft, cursor: "pointer", display: "flex", padding: 2, flexShrink: 0 }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
             ))
           )}

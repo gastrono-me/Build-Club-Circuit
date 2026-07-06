@@ -6,6 +6,7 @@ import { PostBlocker } from "@/components/radar/PostBlocker"
 import { BlockerCard } from "@/components/radar/BlockerCard"
 import { EmbeddingPlot } from "@/components/radar/EmbeddingPlot"
 import { BuildLogFeed } from "@/components/radar/BuildLogFeed"
+import { SkeletonFeed } from "@/components/ui/Skeleton"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, letterSpacing } from "@/lib/design/tokens"
 
 type FeedTab = "shipped" | "stuck"
@@ -204,18 +205,7 @@ export function RadarFeed({ eventId, compose = true }: { eventId?: string | null
         </div>
 
         {loading ? (
-          <div
-            style={{
-              fontFamily: fonts.mono,
-              fontSize: fontSize.label,
-              color: colors.mutedSoft,
-              letterSpacing: letterSpacing.label,
-              textAlign: "center",
-              padding: `${spacing[8]}px 0`,
-            }}
-          >
-            Loading…
-          </div>
+          <SkeletonFeed count={3} label="Loading blockers" />
         ) : blockers.length === 0 ? (
           <div
             style={{

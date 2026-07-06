@@ -153,7 +153,7 @@ export function BlockerCard({
         >
           {/* Hand emoji as lightweight icon */}
           <span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>✋</span>
-          me too
+          Me too
           {metooCount > 0 && (
             <span
               style={{

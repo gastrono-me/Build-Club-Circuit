@@ -9,6 +9,7 @@ import { FolderGit2, MessageCircle, Star } from "lucide-react"
 import { useSocial } from "@/components/shell/SocialProvider"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { ShipComments } from "@/components/radar/ShipComments"
+import { useNow } from "@/lib/hooks/useNow"
 import { shipTime } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
@@ -24,6 +25,10 @@ interface BuildLogCardProps {
   /** Spotlight self-nomination state for the viewer's own post. */
   isNominated?: boolean
   onToggleNominate?: () => void
+  /** Emphasize this card (deep-linked from a notification). */
+  highlight?: boolean
+  /** Start with the comment thread expanded (comment notifications). */
+  defaultOpenComments?: boolean
 }
 
 /** Full local timestamp for the title tooltip, e.g. "Jul 2, 2026, 2:05 PM". */
@@ -43,9 +48,14 @@ export function BuildLogCard({
   onCheer,
   isNominated = false,
   onToggleNominate,
+  highlight = false,
+  defaultOpenComments = false,
 }: BuildLogCardProps) {
   const [voting, setVoting] = React.useState(false)
   const { openPanel } = useSocial()
+  // Ticks every minute so "2m ago" doesn't freeze. Cards render client-fetched
+  // data only, so the pre-mount fallback never reaches the screen.
+  const now = useNow() ?? new Date()
 
   const authorName = post.author_name ?? "Builder"
 
@@ -60,7 +70,11 @@ export function BuildLogCard({
   }
 
   return (
-    <Card spine="go" padding={spacing[4]}>
+    <Card
+      spine="go"
+      padding={spacing[4]}
+      style={highlight ? { boxShadow: `0 0 0 2px ${colors.violet}, 0 0 0 6px ${colors.violetSoft}` } : undefined}
+    >
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginBottom: spacing[3] }}>
         <Avatar name={authorName} photo={post.author_avatar} size={32} />
@@ -102,7 +116,7 @@ export function BuildLogCard({
               marginTop: 2,
             }}
           >
-            {shipTime(post.created_at, new Date())}
+            {shipTime(post.created_at, now)}
           </div>
         </div>
 
@@ -177,7 +191,7 @@ export function BuildLogCard({
           }}
         >
           <span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>👏</span>
-          cheer
+          Cheer
           {cheerCount > 0 && (
             <span
               style={{
@@ -229,7 +243,7 @@ export function BuildLogCard({
         )}
 
         {/* Last in the row: its expanded thread wraps to the full width below */}
-        <ShipComments postId={post.id} count={commentCount} currentUserId={currentUserId} />
+        <ShipComments postId={post.id} count={commentCount} currentUserId={currentUserId} defaultOpen={defaultOpenComments} />
       </div>
     </Card>
   )

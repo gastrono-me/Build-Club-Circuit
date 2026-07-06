@@ -199,7 +199,7 @@ export function EmbeddingPlot({
         }}
       >
         <span style={{ fontSize: 13, lineHeight: 1, color: mineMeToo.has(selectedBlocker.id) ? colors.onDark : colors.violet }}>→</span>
-        me too
+        Me too
         <span style={{ fontWeight: 600, minWidth: 14, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
           {meTooCounts[selectedBlocker.id] ?? 0}
         </span>

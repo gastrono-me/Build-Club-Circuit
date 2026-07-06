@@ -180,7 +180,7 @@ export function ShipsPlot({ posts, cheerCounts, mineCheers, userId, onCheer }: S
           }}
         >
           <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>👏</span>
-          cheer
+          Cheer
           <span style={{ fontWeight: fontWeight.bold, minWidth: 14, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
             {cheerCounts[selected.id] ?? 0}
           </span>

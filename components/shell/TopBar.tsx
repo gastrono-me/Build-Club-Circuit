@@ -198,8 +198,8 @@ export function TopBar() {
                 activity={a}
                 variant="dropdown"
                 onClick={() => {
-                  // The archive holds every ship, however old the reaction target.
-                  router.push("/explore")
+                  // Deep-link to the exact ship; comments open their thread.
+                  router.push(`/explore?ship=${a.postId}${a.kind === "comment" ? "&comments=1" : ""}`)
                   setOpen(false)
                 }}
               />

@@ -1,10 +1,11 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useMemo, useState } from "react"
 import Link from "next/link"
 import { Flame, Check, LifeBuoy, ArrowRight } from "lucide-react"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { useProfile } from "@/lib/hooks/useProfile"
+import { useNow } from "@/lib/hooks/useNow"
 import { usePostBlocker } from "@/lib/hooks/usePostBlocker"
 import { computeStreak } from "@/lib/streak/streak"
 import { PostUpdate } from "@/components/radar/PostUpdate"
@@ -32,10 +33,9 @@ export function TodayView() {
   const postBlocker = usePostBlocker()
   const [stuckOpen, setStuckOpen] = useState(false)
 
-  // Resolve "now" on the client only, to keep streak math real-time without a
-  // server/client hydration mismatch.
-  const [now, setNow] = useState<Date | null>(null)
-  useEffect(() => { setNow(new Date()) }, [])
+  // Client-only (no hydration mismatch) and ticking, so the streak and the
+  // spotlight timestamps stay honest while the tab sits open.
+  const now = useNow()
 
   const streak = useMemo(() => {
     if (!now) return null
@@ -148,6 +148,7 @@ export function TodayView() {
           <SpotlightRail
             posts={todayPosts}
             now={now}
+            headerLink={{ href: "/explore", label: "Explore all" }}
             interactive
             currentUserId={userId}
             cheerCounts={cheerCounts}

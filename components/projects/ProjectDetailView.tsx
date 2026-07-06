@@ -15,6 +15,7 @@ import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/Pro
 import { LinksEditor } from "@/components/projects/LinksEditor"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { ShipComments } from "@/components/radar/ShipComments"
+import { SkeletonFeed } from "@/components/ui/Skeleton"
 import { normalizeLink } from "@/lib/storage/shipMedia"
 import { shipDate, shipDayHeading, shipClock, localDayKey } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
@@ -261,8 +262,8 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
 
   if (loading) {
     return (
-      <div style={{ fontFamily: fonts.mono, fontSize: fontSize.label, color: colors.mutedSoft, letterSpacing: "0.06em", textAlign: "center", padding: `${spacing[8]}px 0` }}>
-        Loading…
+      <div style={{ padding: `${spacing[5]}px ${spacing[4]}px`, maxWidth: 680, margin: "0 auto" }}>
+        <SkeletonFeed count={2} label="Loading project" />
       </div>
     )
   }

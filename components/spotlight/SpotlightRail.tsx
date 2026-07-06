@@ -22,6 +22,8 @@ export interface SpotlightRailProps {
   now: Date
   /** Header label. Defaults to "Shipped today". */
   label?: string
+  /** Optional link rendered in the header (e.g. Today's "Explore all" escape hatch). */
+  headerLink?: { href: string; label: string }
   /** When true, the featured card shows cheer + message actions. */
   interactive?: boolean
   currentUserId?: string | null
@@ -36,6 +38,7 @@ export function SpotlightRail({
   posts,
   now,
   label = "Shipped today",
+  headerLink,
   interactive = false,
   currentUserId = null,
   cheerCounts = {},
@@ -91,8 +94,15 @@ export function SpotlightRail({
         <div style={{ fontFamily: fonts.mono, fontSize: fontSize.label, letterSpacing: "0.08em", textTransform: "uppercase", color: colors.muted }}>
           {label}
         </div>
-        <div style={{ fontFamily: fonts.mono, fontSize: fontSize.meta, color: colors.go }}>
-          {eligible.length} builder{eligible.length === 1 ? "" : "s"}
+        <div style={{ display: "flex", alignItems: "baseline", gap: spacing[3] }}>
+          <span style={{ fontFamily: fonts.mono, fontSize: fontSize.meta, color: colors.go }}>
+            {eligible.length} builder{eligible.length === 1 ? "" : "s"}
+          </span>
+          {headerLink && (
+            <a href={headerLink.href} style={{ fontFamily: fonts.mono, fontSize: fontSize.label, color: colors.violet, textDecoration: "none" }}>
+              {headerLink.label} →
+            </a>
+          )}
         </div>
       </div>
 
@@ -131,7 +141,9 @@ export function SpotlightRail({
         )}
       </div>
 
-      {/* featured full post */}
+      {/* featured full post — polite live region so rotation is announced,
+          not silent, to screen readers (interacting pins and stops it) */}
+      <div aria-live="polite" aria-atomic="true">
       <Card spine="go" padding={spacing[4]}>
         <div style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, letterSpacing: "0.1em", textTransform: "uppercase", color: colors.violet, fontWeight: fontWeight.semibold, marginBottom: spacing[3] }}>
           Featured ship
@@ -166,7 +178,7 @@ export function SpotlightRail({
               aria-label={`Cheer, ${cheerCounts[featured.id] ?? 0}`}
               style={cheerStyle(cheered, !currentUserId || isOwnFeatured)}
             >
-              <span aria-hidden>👏</span> cheer
+              <span aria-hidden>👏</span> Cheer
               {(cheerCounts[featured.id] ?? 0) > 0 && (
                 <span style={{ marginLeft: 4, fontWeight: fontWeight.bold }}>{cheerCounts[featured.id]}</span>
               )}
@@ -205,6 +217,7 @@ export function SpotlightRail({
           )}
         </div>
       </Card>
+      </div>
     </section>
   )
 }

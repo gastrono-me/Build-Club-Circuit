@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useMemo, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Check, Users as UsersIcon } from "lucide-react"
 import { useEvents } from "@/lib/hooks/useEvents"
@@ -11,6 +11,7 @@ import { SectionTitle } from "@/components/ui/SectionTitle"
 import { Button } from "@/components/ui/Button"
 import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/design/tokens"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
+import { useNow } from "@/lib/hooks/useNow"
 import { useSocial } from "@/components/shell/SocialProvider"
 
 type Scope = "event" | "all"
@@ -22,12 +23,10 @@ type Scope = "event" | "all"
  */
 export function EventDetailView({ slug }: { slug: string }) {
   const { events, joined, memberCounts, loading, join, leave } = useEvents()
-  const [now, setNow] = useState<Date | null>(null)
+  const now = useNow()
   const [scope, setScope] = useState<Scope>("event")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => { setNow(new Date()) }, [])
 
   const event = useMemo(() => events.find((e) => e.slug === slug) ?? null, [events, slug])
 

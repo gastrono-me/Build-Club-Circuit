@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import { useSearchParams } from "next/navigation"
 import { Search, X } from "lucide-react"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { useSpotlightNominations } from "@/lib/hooks/useSpotlightNominations"
@@ -8,12 +9,15 @@ import { WORK_CATEGORIES } from "@/lib/data/work-categories"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
 import { ShipsPlot } from "@/components/radar/ShipsPlot"
+import { SkeletonFeed } from "@/components/ui/Skeleton"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion, letterSpacing } from "@/lib/design/tokens"
 
 /** Debounce for the builder-name search, so typing doesn't fire a query per key. */
 const SEARCH_DEBOUNCE_MS = 300
 /** The field is a recent-energy lens, not the archive: cap the nodes it plots. */
 const PLOT_WINDOW = 60
+/** How many extra pages to pull looking for a deep-linked ship before giving up. */
+const DEEP_LINK_MAX_PAGES = 3
 
 /**
  * The Shipped tab, structured as the mirror of the Stuck tab: display header,
@@ -37,6 +41,47 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
 
   const filtering = !!category || !!author
   const clearFilters = () => { setCategory(null); setAuthorInput(""); setAuthor(null) }
+
+  // Dim the list while a filter change is refetching, so results never look
+  // current when they aren't. Cleared as soon as new posts land.
+  const [filterPending, setFilterPending] = React.useState(false)
+  const filterMountRef = React.useRef(false)
+  React.useEffect(() => {
+    if (filterMountRef.current) setFilterPending(true)
+    filterMountRef.current = true
+  }, [category, author])
+  React.useEffect(() => {
+    setFilterPending(false)
+  }, [posts])
+
+  // Deep link from a notification: /explore?ship=<id>[&comments=1] scrolls to
+  // and highlights that card (opening its thread for comment notifications).
+  // If the ship is older than the loaded page, pull a few more pages before
+  // giving up.
+  const searchParams = useSearchParams()
+  const shipParam = searchParams.get("ship")
+  const openComments = searchParams.get("comments") === "1"
+  const deepPagesRef = React.useRef(0)
+  const scrolledRef = React.useRef<string | null>(null)
+  const targetRef = React.useRef<HTMLDivElement | null>(null)
+
+  const shipFound = !!shipParam && posts.some((p) => p.id === shipParam)
+  React.useEffect(() => {
+    if (!shipParam || loading || shipFound) return
+    if (hasMore && deepPagesRef.current < DEEP_LINK_MAX_PAGES) {
+      deepPagesRef.current += 1
+      loadMore()
+    }
+  }, [shipParam, loading, shipFound, hasMore, loadMore])
+
+  React.useEffect(() => {
+    if (!shipParam || !shipFound || scrolledRef.current === shipParam) return
+    scrolledRef.current = shipParam
+    // Let the card render before scrolling.
+    requestAnimationFrame(() => {
+      targetRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+    })
+  }, [shipParam, shipFound])
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: spacing[6] }}>
@@ -188,18 +233,7 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
         </div>
 
         {loading ? (
-          <div
-            style={{
-              fontFamily: fonts.mono,
-              fontSize: fontSize.label,
-              color: colors.mutedSoft,
-              letterSpacing: "0.06em",
-              textAlign: "center",
-              padding: `${spacing[8]}px 0`,
-            }}
-          >
-            Loading…
-          </div>
+          <SkeletonFeed count={3} label="Loading ships" />
         ) : posts.length === 0 ? (
           <div
             style={{
@@ -235,29 +269,41 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
             )}
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: spacing[3],
+              opacity: filterPending ? 0.5 : 1,
+              transition: `opacity ${motion.fast} ${motion.ease}`,
+            }}
+          >
             {posts.map((p) => {
               const isOwn = !!userId && p.author_id === userId
+              const isTarget = p.id === shipParam
               return (
-                <BuildLogCard
-                  key={p.id}
-                  post={p}
-                  cheerCount={cheerCounts[p.id] ?? 0}
-                  commentCount={commentCounts[p.id] ?? 0}
-                  isMine={mineCheers.has(p.id)}
-                  isOwn={isOwn}
-                  currentUserId={userId}
-                  onCheer={() => toggleCheer(p.id)}
-                  isNominated={nominated.has(p.id)}
-                  onToggleNominate={
-                    isOwn
-                      ? () =>
-                          (nominated.has(p.id) ? unnominate(p.id) : nominate(p.id)).catch((err) =>
-                            console.error("[spotlight] nominate toggle failed:", err),
-                          )
-                      : undefined
-                  }
-                />
+                <div key={p.id} ref={isTarget ? targetRef : undefined}>
+                  <BuildLogCard
+                    post={p}
+                    cheerCount={cheerCounts[p.id] ?? 0}
+                    commentCount={commentCounts[p.id] ?? 0}
+                    isMine={mineCheers.has(p.id)}
+                    isOwn={isOwn}
+                    currentUserId={userId}
+                    onCheer={() => toggleCheer(p.id)}
+                    isNominated={nominated.has(p.id)}
+                    highlight={isTarget}
+                    defaultOpenComments={isTarget && openComments}
+                    onToggleNominate={
+                      isOwn
+                        ? () =>
+                            (nominated.has(p.id) ? unnominate(p.id) : nominate(p.id)).catch((err) =>
+                              console.error("[spotlight] nominate toggle failed:", err),
+                            )
+                        : undefined
+                    }
+                  />
+                </div>
               )
             })}
           </div>
