@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { Paperclip, Link2, X } from "lucide-react"
+import { Paperclip, Link2, Plus, X } from "lucide-react"
 import { WORK_CATEGORIES } from "@/types/index"
 import { Button } from "@/components/ui/Button"
 import { useProjects } from "@/lib/hooks/useProjects"
@@ -18,7 +18,11 @@ interface PostUpdateProps {
 }
 
 export function PostUpdate({ onPost }: PostUpdateProps) {
-  const [category, setCategory] = useState<string>(WORK_CATEGORIES[0])
+  // The daily ritual is note-first: one box, one button. Category, project,
+  // link, and file live behind a single "Add details" reveal so logging a ship
+  // costs one decision, not six. An untouched category files as "Other".
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [category, setCategory] = useState<string>("Other")
   const [note, setNote] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -125,6 +129,84 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
         Post an update
       </div>
 
+      {/* Note first — the ritual is one box */}
+      <div>
+        <label
+          style={{
+            display: "block",
+            fontFamily: fonts.mono,
+            fontSize: fontSize.label,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase" as const,
+            color: colors.muted,
+            marginBottom: spacing[2],
+          }}
+        >
+          What did you ship?
+        </label>
+        <div
+          style={{
+            border: `1px solid ${colors.line}`,
+            borderRadius: radii.md,
+            transition: `border-color ${motion.fast} ${motion.ease}, box-shadow ${motion.fast} ${motion.ease}`,
+          }}
+          onFocusCapture={(e) => {
+            e.currentTarget.style.borderColor = colors.violet
+            e.currentTarget.style.boxShadow = shadows.focus
+          }}
+          onBlurCapture={(e) => {
+            e.currentTarget.style.borderColor = colors.line
+            e.currentTarget.style.boxShadow = "none"
+          }}
+        >
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Brief description: what did you just get working?"
+            rows={3}
+            style={{
+              width: "100%",
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              color: colors.ink,
+              fontFamily: fonts.body,
+              fontSize: fontSize.body,
+              padding: "11px 13px",
+              borderRadius: radii.md,
+              resize: "vertical" as const,
+              boxSizing: "border-box" as const,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Everything optional stays behind one reveal */}
+      {!detailsOpen && (
+        <button
+          type="button"
+          onClick={() => setDetailsOpen(true)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            alignSelf: "flex-start",
+            border: "none",
+            background: "transparent",
+            color: colors.muted,
+            padding: 0,
+            fontFamily: fonts.mono,
+            fontSize: fontSize.label,
+            letterSpacing: "0.03em",
+            cursor: "pointer",
+          }}
+        >
+          <Plus size={13} /> Add details (category, project, link, photo)
+        </button>
+      )}
+
+      {detailsOpen && (
+        <>
       {/* Category select */}
       <div>
         <label
@@ -230,58 +312,6 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
         )}
       </div>
 
-      {/* Note textarea */}
-      <div>
-        <label
-          style={{
-            display: "block",
-            fontFamily: fonts.mono,
-            fontSize: fontSize.label,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase" as const,
-            color: colors.muted,
-            marginBottom: spacing[2],
-          }}
-        >
-          What did you ship?
-        </label>
-        <div
-          style={{
-            border: `1px solid ${colors.line}`,
-            borderRadius: radii.md,
-            transition: `border-color ${motion.fast} ${motion.ease}, box-shadow ${motion.fast} ${motion.ease}`,
-          }}
-          onFocusCapture={(e) => {
-            e.currentTarget.style.borderColor = colors.violet
-            e.currentTarget.style.boxShadow = shadows.focus
-          }}
-          onBlurCapture={(e) => {
-            e.currentTarget.style.borderColor = colors.line
-            e.currentTarget.style.boxShadow = "none"
-          }}
-        >
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Brief description: what did you just get working?"
-            rows={3}
-            style={{
-              width: "100%",
-              border: "none",
-              outline: "none",
-              background: "transparent",
-              color: colors.ink,
-              fontFamily: fonts.body,
-              fontSize: fontSize.body,
-              padding: "11px 13px",
-              borderRadius: radii.md,
-              resize: "vertical" as const,
-              boxSizing: "border-box" as const,
-            }}
-          />
-        </div>
-      </div>
-
       {/* Optional attachments: a link + one file */}
       <div style={{ display: "flex", flexDirection: "column", gap: spacing[2] }}>
         <div
@@ -369,6 +399,8 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
           </button>
         )}
       </div>
+        </>
+      )}
 
       {error && (
         <p style={{ margin: 0, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.live }}>

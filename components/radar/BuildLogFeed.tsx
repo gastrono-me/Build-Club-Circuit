@@ -9,6 +9,7 @@ import { WORK_CATEGORIES } from "@/lib/data/work-categories"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
 import { ShipsPlot } from "@/components/radar/ShipsPlot"
+import { CollapsibleField } from "@/components/field/CollapsibleField"
 import { SkeletonFeed } from "@/components/ui/Skeleton"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion, letterSpacing } from "@/lib/design/tokens"
 
@@ -143,13 +144,15 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
       </header>
 
       {/* Hero: the ship field (plots the filtered set, most recent first) */}
-      <ShipsPlot
-        posts={posts.slice(0, PLOT_WINDOW)}
-        cheerCounts={cheerCounts}
-        mineCheers={mineCheers}
-        userId={userId}
-        onCheer={async (id) => { await toggleCheer(id) }}
-      />
+      <CollapsibleField>
+        <ShipsPlot
+          posts={posts.slice(0, PLOT_WINDOW)}
+          cheerCounts={cheerCounts}
+          mineCheers={mineCheers}
+          userId={userId}
+          onCheer={async (id) => { await toggleCheer(id) }}
+        />
+      </CollapsibleField>
 
       {compose && <PostUpdate onPost={post} />}
 

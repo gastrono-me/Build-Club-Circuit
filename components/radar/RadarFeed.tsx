@@ -6,6 +6,7 @@ import { PostBlocker } from "@/components/radar/PostBlocker"
 import { BlockerCard } from "@/components/radar/BlockerCard"
 import { EmbeddingPlot } from "@/components/radar/EmbeddingPlot"
 import { BuildLogFeed } from "@/components/radar/BuildLogFeed"
+import { CollapsibleField } from "@/components/field/CollapsibleField"
 import { SkeletonFeed } from "@/components/ui/Skeleton"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, letterSpacing } from "@/lib/design/tokens"
 
@@ -162,15 +163,17 @@ export function RadarFeed({ eventId, compose = true }: { eventId?: string | null
       </header>
 
       {/* Hero: Embedding Plot */}
-      <EmbeddingPlot
-        blockers={blockers}
-        meTooCounts={meTooCounts}
-        mineMeToo={mineMeToo}
-        userId={userId}
-        onMeToo={toggleMeToo}
-        latestId={latestId}
-        pulseId={pulseId}
-      />
+      <CollapsibleField>
+        <EmbeddingPlot
+          blockers={blockers}
+          meTooCounts={meTooCounts}
+          mineMeToo={mineMeToo}
+          userId={userId}
+          onMeToo={toggleMeToo}
+          latestId={latestId}
+          pulseId={pulseId}
+        />
+      </CollapsibleField>
 
       {/* Post blocker composer (Today owns "I'm stuck"; hidden on the browse-only Explore) */}
       {compose && <PostBlocker onPost={handlePost} />}
