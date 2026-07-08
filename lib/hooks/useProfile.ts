@@ -34,6 +34,7 @@ export function useProfile() {
           looking: data.looking ?? [],
           links: data.links ?? {},
           avatar_url: data.avatar_url ?? undefined,
+          onboarded_at: data.onboarded_at ?? null,
         })
       }
       setLoading(false)

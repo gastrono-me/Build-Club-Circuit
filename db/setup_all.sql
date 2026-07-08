@@ -839,6 +839,14 @@ grant select on public.author_ship_kind_counts to authenticated;
 alter table public.projects
   add column if not exists stage text;
 
+-- 027 onboarding: first-run flag (existing profiles backfilled as onboarded).
+alter table public.profiles
+  add column if not exists onboarded_at timestamptz;
+
+update public.profiles
+  set onboarded_at = coalesce(created_at, now())
+  where onboarded_at is null;
+
 
 -- ─────────────────────────────────────────────────────────
 -- db/migrations/023_admins.sql

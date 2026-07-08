@@ -13,6 +13,7 @@ import { PostBlocker } from "@/components/radar/PostBlocker"
 import { SpotlightRail } from "@/components/spotlight/SpotlightRail"
 import { MyProjectsStrip } from "@/components/projects/MyProjectsStrip"
 import { UpcomingEventsStrip } from "@/components/events/UpcomingEventsStrip"
+import { ProfileNudge } from "@/components/onboarding/ProfileNudge"
 import { useActiveEvent } from "@/lib/hooks/useActiveEvent"
 import { useSocial } from "@/components/shell/SocialProvider"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
@@ -98,6 +99,9 @@ export function TodayView() {
 
         <StreakRow streak={streak} />
       </header>
+
+      {/* Recover thin profiles (usually onboarding skippers) */}
+      <ProfileNudge />
 
       {/* The ritual prompt */}
       <div style={{ marginBottom: spacing[6] }}>

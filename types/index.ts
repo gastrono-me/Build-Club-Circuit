@@ -63,6 +63,8 @@ export interface Profile {
     instagram?: string
   }
   avatar_url?: string
+  /** When the builder finished (or skipped) first-run onboarding; null = not yet. */
+  onboarded_at?: string | null
 }
 
 // ---- Blocker ----------------------------------------------------------------
