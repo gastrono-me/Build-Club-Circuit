@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 
 export interface EventRow {
@@ -26,6 +26,15 @@ export function useEvents() {
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
+
+  // A unique channel topic per hook instance. supabase.channel(topic) *reuses*
+  // an existing channel with the same topic, so two useEvents() on one page
+  // (e.g. Today mounts it via useActiveEvent + UpcomingEventsStrip) would grab
+  // the same already-subscribed "events" channel and throw "cannot add
+  // postgres_changes callbacks ... after subscribe()". Distinct topics keep each
+  // instance's subscription independent.
+  const topicRef = useRef<string>()
+  if (!topicRef.current) topicRef.current = `events-${Math.random().toString(36).slice(2)}`
 
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
@@ -67,7 +76,7 @@ export function useEvents() {
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
-      .channel("events")
+      .channel(topicRef.current!)
       .on("postgres_changes", { event: "*", schema: "public", table: "events" }, () => { fetchAll() })
       .on("postgres_changes", { event: "*", schema: "public", table: "event_members" }, () => { fetchAll() })
       .subscribe()
