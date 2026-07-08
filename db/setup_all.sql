@@ -806,6 +806,45 @@ grant select on public.ship_comment_counts to authenticated;
 
 
 -- ─────────────────────────────────────────────────────────
+-- db/migrations/023_admins.sql
+-- ─────────────────────────────────────────────────────────
+-- 023 admins: staff role (separate table, not a self-grantable profile flag);
+-- events become admin-managed. Bootstrap the first admin from the SQL editor:
+--   insert into public.admins (user_id) values ('<your-profile-uuid>');
+create table if not exists public.admins (
+  user_id    uuid primary key references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+alter table public.admins enable row level security;
+
+drop policy if exists admins_select_own on public.admins;
+create policy admins_select_own on public.admins
+  for select to authenticated using (user_id = auth.uid());
+
+create or replace function public.is_admin()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.admins where user_id = auth.uid());
+$$;
+grant execute on function public.is_admin() to authenticated;
+
+drop policy if exists events_insert_own on public.events;
+drop policy if exists events_insert_admin on public.events;
+create policy events_insert_admin on public.events
+  for insert to authenticated with check (public.is_admin());
+
+drop policy if exists events_update_own on public.events;
+drop policy if exists events_update_admin on public.events;
+create policy events_update_admin on public.events
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists events_delete_own on public.events;
+drop policy if exists events_delete_admin on public.events;
+create policy events_delete_admin on public.events
+  for delete to authenticated using (public.is_admin());
+
+
+-- ─────────────────────────────────────────────────────────
 -- db/migrations/022_evergreen_data.sql (remap only)
 -- ─────────────────────────────────────────────────────────
 -- 022: remap legacy AABW-era categories to the shared work taxonomy. No-op on

@@ -37,7 +37,7 @@ Email magic-link sign-in works with no extra setup. Google/GitHub OAuth need pro
 
 ## What's real vs seeded (important context)
 - **Real / persisted:** everything user-facing — accounts (magic-link; OAuth when configured), profiles, ships (with photo/file/link attachments in the public `ships` bucket) + cheers + spotlight nominations, blockers + me-toos, projects (labels, links), direct messages, calendar catchups, and the notifications bell (messages + catchup requests + cheers on your ships, read cursor in `activity_reads`). Live updates fan out over a shared Realtime **Broadcast** bus (`lib/realtime/feedBus.ts`), not per-row postgres_changes.
-- **Seeded:** a few starter community blockers and the two events in `db/seed.sql`. Events are a real table with join/leave + member counts, but there's no create-event UI yet (Phase 3) — new events are inserted by hand.
+- **Seeded:** a few starter community blockers and the two events in `db/seed.sql`. Events are managed by staff from `/admin` (create/edit/delete). Staff = a row in `public.admins`, a deliberately separate table (not a self-grantable `profiles` flag); bootstrap the first admin from the SQL editor (`insert into public.admins (user_id) values ('<uuid>')`). Admin-only writes are enforced by RLS `is_admin()`; the `/admin` route + the "Admin" nav item are gated by `useIsAdmin`.
 - **AI:** local-logic fallbacks only (no token spend) — match reasons in People and Pitch Coach feedback (`lib/ai/local-fallbacks.ts`). There is no server-side AI proxy; add one deliberately if a real AI feature lands.
 
 ## Conventions

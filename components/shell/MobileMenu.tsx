@@ -10,6 +10,7 @@ import { GroupLabel } from "@/components/shell/Nav"
 import { Avatar } from "@/components/shell/Avatar"
 import { CatchupRequestRow, ActivityNotificationRow, MessageRow } from "@/components/shell/NotificationItems"
 import { useProfile } from "@/lib/hooks/useProfile"
+import { useIsAdmin } from "@/lib/hooks/useIsAdmin"
 import { useSocial } from "@/components/shell/SocialProvider"
 
 /** Mobile-only hamburger trigger + slide-out drawer holding nav, mode/clock controls, and messages. */
@@ -22,6 +23,7 @@ export function MobileMenu() {
   const name = loading || !profile ? "Profile" : profile.name || "Profile"
   const avatar_url = profile?.avatar_url
 
+  const { isAdmin } = useIsAdmin()
   const { inbox, totalUnread, pendingCatchups, openPanel, activity, unreadActivity, markActivityRead } = useSocial()
   const notificationCount = totalUnread + pendingCatchups.length + unreadActivity
   const badgeCount = notificationCount > 9 ? "9+" : String(notificationCount)
@@ -183,14 +185,18 @@ export function MobileMenu() {
 
           {/* Nav items — every destination always listed, grouped */}
           <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: spacing[3] }}>
-            {NAV_GROUPS.map(group => (
-              <React.Fragment key={group.label}>
-                <GroupLabel>{group.label}</GroupLabel>
-                {group.items.map(item => (
-                  <MobileNavLink key={item.href} item={item} active={isActivePath(pathname, item.href)} onClick={() => setOpen(false)} />
-                ))}
-              </React.Fragment>
-            ))}
+            {NAV_GROUPS.map(group => {
+              const items = group.items.filter((it) => !it.adminOnly || isAdmin)
+              if (items.length === 0) return null
+              return (
+                <React.Fragment key={group.label}>
+                  <GroupLabel>{group.label}</GroupLabel>
+                  {items.map(item => (
+                    <MobileNavLink key={item.href} item={item} active={isActivePath(pathname, item.href)} onClick={() => setOpen(false)} />
+                  ))}
+                </React.Fragment>
+              )
+            })}
           </div>
 
           <div style={{ height: 1, background: colors.line, margin: `0 ${spacing[3]}px` }} />

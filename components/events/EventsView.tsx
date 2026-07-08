@@ -4,7 +4,9 @@ import React, { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Check, Users as UsersIcon } from "lucide-react"
 import { useEvents, type EventRow } from "@/lib/hooks/useEvents"
+import { useIsAdmin } from "@/lib/hooks/useIsAdmin"
 import { eventStatus, PHASE_ORDER, type EventPhase } from "@/lib/events/eventStatus"
+import { Shield } from "lucide-react"
 import { SectionTitle } from "@/components/ui/SectionTitle"
 import { Card } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
@@ -18,6 +20,7 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/desig
  */
 export function EventsView() {
   const { events, joined, memberCounts, loading, join, leave } = useEvents()
+  const { isAdmin } = useIsAdmin()
 
   const [now, setNow] = useState<Date | null>(null)
   useEffect(() => { setNow(new Date()) }, [])
@@ -39,6 +42,22 @@ export function EventsView() {
         title="Episodes"
         note="Build Club events, past and upcoming. Join one to plug your build into it."
       />
+
+      {isAdmin && (
+        <div style={{ margin: `${spacing[3]}px 0 ${spacing[5]}px` }}>
+          <Link
+            href="/admin"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              border: `1.4px solid ${colors.line}`, borderRadius: radii.md,
+              padding: "7px 12px", textDecoration: "none",
+              fontFamily: fonts.mono, fontSize: fontSize.label, color: colors.violet, background: colors.panel,
+            }}
+          >
+            <Shield size={13} /> New event · Manage events
+          </Link>
+        </div>
+      )}
 
       {loading || !now ? (
         <Loading />

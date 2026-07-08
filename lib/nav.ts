@@ -5,6 +5,7 @@ import {
   Compass,
   Mic,
   FolderGit2,
+  Shield,
   type LucideIcon,
 } from "lucide-react"
 
@@ -12,6 +13,8 @@ export interface NavItem {
   label: string
   href: string
   Icon: LucideIcon
+  /** Only rendered for staff (a row in public.admins). */
+  adminOnly?: boolean
 }
 
 export interface NavGroup {
@@ -53,6 +56,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Explore", href: "/explore", Icon: Compass },
       { label: "People", href: "/people", Icon: Users },
       { label: "Events", href: "/events", Icon: CalendarRange },
+      { label: "Admin", href: "/admin", Icon: Shield, adminOnly: true },
     ],
   },
 ]

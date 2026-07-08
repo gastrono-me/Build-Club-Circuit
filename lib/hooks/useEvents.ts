@@ -99,5 +99,60 @@ export function useEvents() {
     if (error) throw error
   }, [])
 
-  return { events, joined, memberCounts, loading, userId, join, leave }
+  /** The editable fields of an event. Phase/status is derived from the dates. */
+  interface EventInput {
+    slug: string
+    name: string
+    tagline?: string | null
+    location?: string | null
+    starts_at: string
+    ends_at: string
+  }
+
+  // Admin-only at the DB layer (RLS is_admin()); the client gates the UI too.
+  const create = useCallback(async (input: EventInput): Promise<EventRow> => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("Not authenticated")
+    const { data, error } = await supabase
+      .from("events")
+      .insert({
+        slug: input.slug.trim(),
+        name: input.name.trim(),
+        tagline: input.tagline?.trim() || null,
+        location: input.location?.trim() || null,
+        starts_at: input.starts_at,
+        ends_at: input.ends_at,
+        created_by: user.id,
+      })
+      .select("id, slug, name, tagline, location, starts_at, ends_at, created_by, created_at")
+      .single()
+    if (error) throw error
+    await fetchAll()
+    return data as EventRow
+  }, [fetchAll])
+
+  const update = useCallback(async (eventId: string, input: EventInput): Promise<void> => {
+    const { error } = await createClient()
+      .from("events")
+      .update({
+        slug: input.slug.trim(),
+        name: input.name.trim(),
+        tagline: input.tagline?.trim() || null,
+        location: input.location?.trim() || null,
+        starts_at: input.starts_at,
+        ends_at: input.ends_at,
+      })
+      .eq("id", eventId)
+    if (error) throw error
+    await fetchAll()
+  }, [fetchAll])
+
+  const remove = useCallback(async (eventId: string): Promise<void> => {
+    const { error } = await createClient().from("events").delete().eq("id", eventId)
+    if (error) throw error
+    await fetchAll()
+  }, [fetchAll])
+
+  return { events, joined, memberCounts, loading, userId, join, leave, create, update, remove }
 }

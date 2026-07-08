@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { type LucideIcon } from "lucide-react"
 import { colors, fonts, fontSize, fontWeight, spacing, radii, motion, letterSpacing } from "@/lib/design/tokens"
 import { NAV_GROUPS, isActivePath } from "@/lib/nav"
+import { useIsAdmin } from "@/lib/hooks/useIsAdmin"
 
 /** Mono section label above a nav group ("PULSE" / "LINE"). Shared with MobileMenu's drawer nav. */
 export function GroupLabel({ children }: { children: React.ReactNode }) {
@@ -33,6 +34,7 @@ export function GroupLabel({ children }: { children: React.ReactNode }) {
  */
 export function Nav() {
   const pathname = usePathname()
+  const { isAdmin } = useIsAdmin()
 
   return (
     <>
@@ -59,14 +61,18 @@ export function Nav() {
         }
       `}</style>
       <nav className="vec-nav" aria-label="Main navigation">
-        {NAV_GROUPS.map((group) => (
-          <React.Fragment key={group.label}>
-            <GroupLabel>{group.label}</GroupLabel>
-            {group.items.map(({ label, href, Icon }) => (
-              <NavLink key={href} label={label} href={href} Icon={Icon} active={isActivePath(pathname, href)} />
-            ))}
-          </React.Fragment>
-        ))}
+        {NAV_GROUPS.map((group) => {
+          const items = group.items.filter((it) => !it.adminOnly || isAdmin)
+          if (items.length === 0) return null
+          return (
+            <React.Fragment key={group.label}>
+              <GroupLabel>{group.label}</GroupLabel>
+              {items.map(({ label, href, Icon }) => (
+                <NavLink key={href} label={label} href={href} Icon={Icon} active={isActivePath(pathname, href)} />
+              ))}
+            </React.Fragment>
+          )
+        })}
       </nav>
     </>
   )
