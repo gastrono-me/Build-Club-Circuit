@@ -2,6 +2,7 @@
 
 import React from "react"
 import { useRouter } from "next/navigation"
+import QRCode from "react-qr-code"
 import { X, FolderGit2 } from "lucide-react"
 import { useBuildLog, type BuildLogRow } from "@/lib/hooks/useBuildLog"
 import { Avatar } from "@/components/shell/Avatar"
@@ -12,33 +13,50 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/desig
 
 /** How long each ship holds centre stage. */
 const ROTATE_MS = 9000
+/** Width of one slide slot, in vw. Neighbours peek in the remaining width. */
+const STRIDE_VW = 48
 
 /**
  * A full-screen, no-interaction coverflow of recent ships for an IRL screen or
- * projector. The current ship holds centre; the previous and next peek in,
- * dimmed and scaled, on each side. Auto-rotates; new ships fold in live (the
- * feed rides the shared broadcast bus). Rendered as a fixed overlay over the
- * app chrome.
+ * projector. Ships sit on a horizontal track that slides one slot per tick, so
+ * the previous and next ships peek in (dimmed, scaled) on each side and the
+ * next slides into centre. Auto-rotates; new ships fold in live (the feed rides
+ * the shared broadcast bus). A QR points people at Circuit to join.
  */
 export function ShipCarousel() {
   const router = useRouter()
   const { posts, cheerCounts, commentCounts, loading } = useBuildLog()
   const [index, setIndex] = React.useState(0)
+  const [snap, setSnap] = React.useState(false) // true = no transition (wrap jump)
   const [now, setNow] = React.useState<Date>(() => new Date())
+  const [joinUrl, setJoinUrl] = React.useState("")
 
   const ships = React.useMemo(() => posts.slice(0, 30), [posts])
   const len = ships.length
+
+  React.useEffect(() => { setJoinUrl(window.location.origin) }, [])
 
   React.useEffect(() => {
     if (len && index >= len) setIndex(0)
   }, [len, index])
 
-  // Auto-advance + a slow header clock.
+  // Auto-advance. On the wrap back to 0, snap without a transition so the track
+  // doesn't sweep the whole width.
   React.useEffect(() => {
     if (len <= 1) return
-    const t = setInterval(() => setIndex((i) => (i + 1) % len), ROTATE_MS)
+    const t = setInterval(() => {
+      setIndex((i) => {
+        const next = (i + 1) % len
+        if (next === 0) {
+          setSnap(true)
+          requestAnimationFrame(() => requestAnimationFrame(() => setSnap(false)))
+        }
+        return next
+      })
+    }, ROTATE_MS)
     return () => clearInterval(t)
   }, [len])
+
   React.useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000)
     return () => clearInterval(t)
@@ -50,10 +68,7 @@ export function ShipCarousel() {
     return () => window.removeEventListener("keydown", onKey)
   }, [router])
 
-  const current = ships[index] ?? null
-  // Neighbours only make sense with 3+; with 2 they'd duplicate.
-  const prev = len > 2 ? ships[(index - 1 + len) % len] : null
-  const next = len > 2 ? ships[(index + 1) % len] : null
+  const transition = snap ? "none" : "transform 0.65s cubic-bezier(0.2,0,0,1)"
 
   return (
     <div
@@ -86,23 +101,45 @@ export function ShipCarousel() {
       </div>
 
       {/* Coverflow stage */}
-      <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, overflow: "hidden" }}>
-        {loading ? null : !current ? (
-          <div style={{ fontFamily: fonts.body, fontSize: "clamp(20px, 3vw, 30px)", color: colors.muted, textAlign: "center", padding: spacing[6] }}>
+      <div style={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden" }}>
+        {loading ? null : !len ? (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fonts.body, fontSize: "clamp(20px, 3vw, 30px)", color: colors.muted, textAlign: "center", padding: spacing[6] }}>
             No ships logged yet. This screen lights up as the cohort ships.
           </div>
         ) : (
-          <>
-            {prev && <SidePreview ship={prev} side="left" />}
-            {next && <SidePreview ship={next} side="right" />}
-            <CenterShip
-              key={current.id}
-              ship={current}
-              now={now}
-              cheers={cheerCounts[current.id] ?? 0}
-              comments={commentCounts[current.id] ?? 0}
-            />
-          </>
+          <div
+            style={{
+              position: "absolute",
+              left: "50vw",
+              top: "50%",
+              display: "flex",
+              alignItems: "center",
+              transform: `translateX(calc(-${index * STRIDE_VW}vw - ${STRIDE_VW / 2}vw)) translateY(-50%)`,
+              transition,
+            }}
+          >
+            {ships.map((s, i) => {
+              const active = i === index
+              return (
+                <div
+                  key={s.id}
+                  style={{
+                    width: `${STRIDE_VW}vw`,
+                    flexShrink: 0,
+                    display: "flex",
+                    justifyContent: "center",
+                    transform: active ? "scale(1)" : "scale(0.78)",
+                    opacity: active ? 1 : 0.3,
+                    transition: snap ? "none" : "transform 0.65s cubic-bezier(0.2,0,0,1), opacity 0.65s ease",
+                  }}
+                >
+                  {active
+                    ? <CenterShip ship={s} now={now} cheers={cheerCounts[s.id] ?? 0} comments={commentCounts[s.id] ?? 0} />
+                    : <SidePreview ship={s} />}
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
 
@@ -115,10 +152,20 @@ export function ShipCarousel() {
         </div>
       )}
 
-      <style>{`
-        @keyframes radarPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.3 } }
-        @keyframes carouselIn { from { opacity: 0; transform: translateX(6%) scale(0.97) } to { opacity: 1; transform: translateX(0) scale(1) } }
-      `}</style>
+      {/* Join QR, tucked in the corner */}
+      {joinUrl && (
+        <div style={{ position: "absolute", right: spacing[6], bottom: spacing[6], display: "flex", alignItems: "center", gap: spacing[3], background: colors.surface, border: `1.5px solid ${colors.ink}`, borderRadius: radii.lg, padding: spacing[3], zIndex: 4 }}>
+          <div style={{ background: "#fff", padding: 6, borderRadius: radii.sm, lineHeight: 0 }}>
+            <QRCode value={joinUrl} size={84} bgColor="#ffffff" fgColor={colors.ink} />
+          </div>
+          <div style={{ maxWidth: 130 }}>
+            <div style={{ fontFamily: fonts.display, fontWeight: fontWeight.semibold, fontSize: fontSize.body, color: colors.ink, lineHeight: 1.1 }}>Join the build</div>
+            <div style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft, marginTop: 3 }}>Scan to ship with the cohort</div>
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes radarPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.3 } }`}</style>
     </div>
   )
 }
@@ -127,31 +174,18 @@ export function ShipCarousel() {
 function CenterShip({ ship, now, cheers, comments }: { ship: BuildLogRow; now: Date; cheers: number; comments: number }) {
   const isImage = !!ship.media_url && (ship.media_type?.startsWith("image/") ?? false)
   return (
-    <div
-      style={{
-        position: "relative",
-        zIndex: 3,
-        display: "flex",
-        gap: "clamp(24px, 4vw, 64px)",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "min(72vw, 1180px)",
-        flexWrap: "wrap",
-        padding: `0 clamp(${spacing[4]}px, 4vw, 60px)`,
-        animation: "carouselIn 0.55s cubic-bezier(0.2,0,0,1)",
-      }}
-    >
+    <div style={{ display: "flex", gap: "clamp(20px, 3vw, 56px)", alignItems: "center", justifyContent: "center", width: "100%", flexWrap: "wrap", padding: `0 clamp(${spacing[3]}px, 2vw, 32px)`, boxSizing: "border-box" }}>
       {isImage && (
-        <div style={{ flex: "1 1 340px", maxWidth: 560, minWidth: 260 }}>
+        <div style={{ flex: "1 1 300px", maxWidth: 520, minWidth: 220 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={ship.media_url!} alt="" style={{ width: "100%", maxHeight: "58vh", objectFit: "cover", borderRadius: radii.xl, border: `1.5px solid ${colors.ink}` }} />
+          <img src={ship.media_url!} alt="" style={{ width: "100%", maxHeight: "54vh", objectFit: "cover", borderRadius: radii.xl, border: `1.5px solid ${colors.ink}` }} />
         </div>
       )}
-      <div style={{ flex: "1 1 420px", minWidth: 280, maxWidth: 720 }}>
+      <div style={{ flex: "1 1 360px", minWidth: 240, maxWidth: 680 }}>
         <div style={{ display: "flex", alignItems: "center", gap: spacing[3], marginBottom: spacing[4] }}>
-          <Avatar name={ship.author_name ?? "Builder"} photo={ship.author_avatar} size={56} />
+          <Avatar name={ship.author_name ?? "Builder"} photo={ship.author_avatar} size={52} />
           <div>
-            <div style={{ fontFamily: fonts.body, fontWeight: fontWeight.bold, fontSize: "clamp(20px, 2.4vw, 30px)", color: colors.ink, lineHeight: 1.1 }}>
+            <div style={{ fontFamily: fonts.body, fontWeight: fontWeight.bold, fontSize: "clamp(19px, 2.2vw, 28px)", color: colors.ink, lineHeight: 1.1 }}>
               {ship.author_name ?? "Builder"}
             </div>
             <div style={{ fontFamily: fonts.mono, fontSize: fontSize.body, color: colors.mutedSoft, marginTop: 2 }}>
@@ -159,7 +193,7 @@ function CenterShip({ ship, now, cheers, comments }: { ship: BuildLogRow; now: D
             </div>
           </div>
         </div>
-        <p style={{ margin: 0, fontFamily: fonts.display, fontWeight: fontWeight.semibold, fontSize: "clamp(26px, 3.6vw, 48px)", lineHeight: 1.12, letterSpacing: "-0.02em", color: colors.ink }}>
+        <p style={{ margin: 0, fontFamily: fonts.display, fontWeight: fontWeight.semibold, fontSize: "clamp(24px, 3.2vw, 46px)", lineHeight: 1.12, letterSpacing: "-0.02em", color: colors.ink }}>
           {ship.note}
         </p>
         <div style={{ display: "flex", alignItems: "center", gap: spacing[3], flexWrap: "wrap", marginTop: spacing[5] }}>
@@ -178,47 +212,17 @@ function CenterShip({ ship, now, cheers, comments }: { ship: BuildLogRow; now: D
   )
 }
 
-/** A dimmed, scaled neighbour peeking in from one edge. */
-function SidePreview({ ship, side }: { ship: BuildLogRow; side: "left" | "right" }) {
+/** A neighbour peeking in: author + a clamped note. */
+function SidePreview({ ship }: { ship: BuildLogRow }) {
   return (
-    <div
-      aria-hidden
-      style={{
-        position: "absolute",
-        top: "50%",
-        [side]: 0,
-        width: "clamp(240px, 30vw, 440px)",
-        transform: `translate(${side === "left" ? "-32%" : "32%"}, -50%) scale(0.8)`,
-        opacity: 0.32,
-        zIndex: 1,
-        pointerEvents: "none",
-        background: colors.panel,
-        border: `1.5px solid ${colors.line}`,
-        borderRadius: radii.xl,
-        padding: spacing[5],
-        boxSizing: "border-box",
-      }}
-    >
+    <div aria-hidden style={{ width: "min(88%, 460px)", background: colors.panel, border: `1.5px solid ${colors.line}`, borderRadius: radii.xl, padding: spacing[5], boxSizing: "border-box" }}>
       <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginBottom: spacing[3] }}>
-        <Avatar name={ship.author_name ?? "Builder"} photo={ship.author_avatar} size={38} />
-        <span style={{ fontFamily: fonts.body, fontWeight: fontWeight.semibold, fontSize: "clamp(16px, 1.5vw, 22px)", color: colors.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <Avatar name={ship.author_name ?? "Builder"} photo={ship.author_avatar} size={36} />
+        <span style={{ fontFamily: fonts.body, fontWeight: fontWeight.semibold, fontSize: "clamp(15px, 1.4vw, 20px)", color: colors.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {ship.author_name ?? "Builder"}
         </span>
       </div>
-      <p
-        style={{
-          margin: 0,
-          fontFamily: fonts.display,
-          fontWeight: fontWeight.semibold,
-          fontSize: "clamp(18px, 1.9vw, 26px)",
-          lineHeight: 1.2,
-          color: colors.ink,
-          display: "-webkit-box",
-          WebkitLineClamp: 4,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-        }}
-      >
+      <p style={{ margin: 0, fontFamily: fonts.display, fontWeight: fontWeight.semibold, fontSize: "clamp(17px, 1.8vw, 26px)", lineHeight: 1.2, color: colors.ink, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
         {ship.note}
       </p>
     </div>

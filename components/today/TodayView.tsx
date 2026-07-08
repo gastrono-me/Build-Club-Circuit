@@ -12,6 +12,7 @@ import { PostUpdate } from "@/components/radar/PostUpdate"
 import { PostBlocker } from "@/components/radar/PostBlocker"
 import { SpotlightRail } from "@/components/spotlight/SpotlightRail"
 import { MyProjectsStrip } from "@/components/projects/MyProjectsStrip"
+import { UpcomingEventsStrip } from "@/components/events/UpcomingEventsStrip"
 import { useSocial } from "@/components/shell/SocialProvider"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
 
@@ -141,6 +142,9 @@ export function TodayView() {
 
       {/* What you're building — ships ladder into projects */}
       {now && <MyProjectsStrip now={now} />}
+
+      {/* Live + upcoming events you can join */}
+      {now && <UpcomingEventsStrip now={now} />}
 
       {/* Shipped today — the day's cohort activity. History lives on Explore. */}
       {now && (
