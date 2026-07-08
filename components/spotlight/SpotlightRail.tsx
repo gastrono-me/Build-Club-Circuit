@@ -8,6 +8,7 @@ import { Tag } from "@/components/ui/Tag"
 import { selectSpotlight } from "@/lib/spotlight/rotation"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { ShipComments } from "@/components/radar/ShipComments"
+import { ShipKindBadge } from "@/components/radar/ShipKindBadge"
 import { PersonButton } from "@/components/shell/PersonButton"
 import { shipTime } from "@/lib/time"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
@@ -162,6 +163,7 @@ export function SpotlightRail({
               </div>
             </div>
           </PersonButton>
+          <ShipKindBadge kind={featured.kind} />
           <Tag tone="go">{featured.category}</Tag>
         </div>
 

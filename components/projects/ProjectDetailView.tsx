@@ -5,7 +5,8 @@ import Link from "next/link"
 import { ArrowLeft, ExternalLink, FolderGit2, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { subscribeFeed, BUILD_LOG_TOPIC } from "@/lib/realtime/feedBus"
+import { subscribeFeed, notifyFeed, BUILD_LOG_TOPIC } from "@/lib/realtime/feedBus"
+import { SHIP_KINDS, SHIP_KIND_PLURAL } from "@/lib/data/ship-kinds"
 import { SectionTitle } from "@/components/ui/SectionTitle"
 import { Tag } from "@/components/ui/Tag"
 import { Input } from "@/components/ui/Input"
@@ -16,6 +17,7 @@ import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/Pro
 import { LinksEditor } from "@/components/projects/LinksEditor"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { ShipComments } from "@/components/radar/ShipComments"
+import { ShipKindBadge } from "@/components/radar/ShipKindBadge"
 import { SkeletonFeed } from "@/components/ui/Skeleton"
 import { normalizeLink } from "@/lib/storage/shipMedia"
 import { shipDate, shipDayHeading, shipClock, localDayKey } from "@/lib/time"
@@ -59,6 +61,7 @@ interface ShipRow {
   id: string
   author_id: string
   category: string
+  kind: string
   note: string
   created_at: string
   link_url: string | null
@@ -79,6 +82,8 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<ProjectMeta | null>(null)
   const [ships, setShips] = useState<ShipRow[]>([])
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
+  // Per-kind totals across ALL of the project's ships (not just the loaded page).
+  const [kindCounts, setKindCounts] = useState<Record<string, number>>({})
   const [limit, setLimit] = useState(PAGE)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -110,7 +115,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         .maybeSingle(),
       supabase
         .from("build_log")
-        .select("id, author_id, category, note, created_at, link_url, media_url, media_type, media_name, profiles:author_id ( name, avatar_url )")
+        .select("id, author_id, category, kind, note, created_at, link_url, media_url, media_type, media_name, profiles:author_id ( name, avatar_url )")
         .eq("project_id", projectId)
         .order("created_at", { ascending: false })
         .limit(limit),
@@ -141,6 +146,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       id: s.id,
       author_id: s.author_id,
       category: s.category,
+      kind: s.kind ?? "Update",
       note: s.note,
       created_at: s.created_at,
       link_url: s.link_url ?? null,
@@ -152,6 +158,18 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     }))
     setShips(rows)
     setHasMore(rows.length >= limit)
+
+    // Per-kind totals for the tally: whole project, not just the loaded page.
+    const { data: kcData, error: kcErr } = await supabase
+      .from("project_ship_kind_counts")
+      .select("kind, count")
+      .eq("project_id", projectId)
+    if (kcErr) console.error("[project] kind counts fetch error:", kcErr)
+    const kc: Record<string, number> = {}
+    for (const row of (kcData ?? []) as { kind: string; count: number }[]) {
+      kc[row.kind] = row.count
+    }
+    setKindCounts(kc)
 
     // Comment counts for the loaded ships (one bounded query to the view).
     if (rows.length) {
@@ -247,6 +265,20 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     }
   }
 
+  // Reclassify one of your own ships (RLS build_log_update_own). Optimistic on
+  // the row; the tally refetches so its totals stay exact.
+  async function updateKind(shipId: string, kind: string) {
+    setShips((prev) => prev.map((s) => (s.id === shipId ? { ...s, kind } : s)))
+    const { error } = await createClient().from("build_log").update({ kind }).eq("id", shipId)
+    if (error) {
+      console.error("[project] kind update failed:", error)
+      fetchAll()
+      return
+    }
+    notifyFeed(BUILD_LOG_TOPIC)
+    fetchAll()
+  }
+
   async function handleDelete() {
     if (!project) return
     if (!window.confirm(`Delete "${project.name}"? Its ships stay in the log, they just lose the project tag.`)) return
@@ -281,6 +313,12 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   }
 
   const isOwner = !!userId && project.owner_id === userId
+
+  // Exact totals from the aggregate view (not the paginated page).
+  const totalShips = Object.values(kindCounts).reduce((a, b) => a + b, 0)
+  const tally = SHIP_KINDS
+    .filter((k) => (kindCounts[k] ?? 0) > 0)
+    .map((k) => `${kindCounts[k]} ${SHIP_KIND_PLURAL[k] ?? k.toLowerCase()}`)
 
   return (
     <div style={{ padding: `${spacing[5]}px ${spacing[4]}px`, maxWidth: 680, margin: "0 auto" }}>
@@ -353,7 +391,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             </PersonButton>
           )}
           <span>started {shipDate(project.created_at, now)}</span>
-          <span style={{ color: colors.go }}>{ships.length}{hasMore ? "+" : ""} ship{ships.length === 1 ? "" : "s"}</span>
+          <span style={{ color: colors.go }}>{totalShips} ship{totalShips === 1 ? "" : "s"}</span>
           {project.links.map((url) => (
             <a
               key={url}
@@ -380,6 +418,18 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             </a>
           ))}
         </div>
+
+        {/* Progress tally: total + per-type breakdown across all ships */}
+        {tally.length > 0 && (
+          <div style={{ marginTop: spacing[3], fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted }}>
+            {tally.map((part, i) => (
+              <React.Fragment key={part}>
+                {i > 0 && <span style={{ color: colors.line }}> · </span>}
+                <span>{part}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
 
         {/* Details: edit the project (owner) or show its labels */}
         {editing ? (
@@ -478,6 +528,31 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                         {shipClock(s.created_at)}
                       </span>
                       <Tag tone="go">{s.category}</Tag>
+                      {!!userId && s.author_id === userId ? (
+                        <select
+                          value={s.kind}
+                          onChange={(e) => updateKind(s.id, e.target.value)}
+                          aria-label="Ship type"
+                          style={{
+                            fontFamily: fonts.mono,
+                            fontSize: fontSize.micro,
+                            letterSpacing: "0.06em",
+                            textTransform: "uppercase",
+                            color: colors.violet,
+                            background: colors.violetSoft,
+                            border: "none",
+                            borderRadius: radii.pill,
+                            padding: "3px 8px",
+                            cursor: "pointer",
+                            appearance: "none",
+                            outline: "none",
+                          }}
+                        >
+                          {SHIP_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+                        </select>
+                      ) : (
+                        <ShipKindBadge kind={s.kind} />
+                      )}
                       {s.author_name && (
                         <PersonButton person={{ id: s.author_id, name: s.author_name, avatar: s.author_avatar }} style={{ marginLeft: "auto", gap: 6, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted }}>
                           <Avatar name={s.author_name} photo={s.author_avatar} size={18} />

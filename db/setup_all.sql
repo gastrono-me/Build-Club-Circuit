@@ -806,6 +806,28 @@ grant select on public.ship_comment_counts to authenticated;
 
 
 -- ─────────────────────────────────────────────────────────
+-- db/migrations/024_ship_kind.sql
+-- ─────────────────────────────────────────────────────────
+-- 024 ship type: Update / Feature / Milestone axis + per-project-kind counts.
+alter table public.build_log
+  add column if not exists kind text not null default 'Update';
+
+drop policy if exists build_log_update_own on public.build_log;
+create policy build_log_update_own on public.build_log
+  for update to authenticated
+  using (auth.uid() = author_id) with check (auth.uid() = author_id);
+
+create or replace view public.project_ship_kind_counts
+  with (security_invoker = on) as
+  select project_id, kind, count(*)::int as count
+  from public.build_log
+  where project_id is not null
+  group by project_id, kind;
+
+grant select on public.project_ship_kind_counts to authenticated;
+
+
+-- ─────────────────────────────────────────────────────────
 -- db/migrations/023_admins.sql
 -- ─────────────────────────────────────────────────────────
 -- 023 admins: staff role (separate table, not a self-grantable profile flag);

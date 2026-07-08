@@ -9,6 +9,8 @@ export interface BuildLogRow {
   id: string
   author_id: string
   category: string
+  /** Significance tier: Update | Feature | Milestone (default Update). */
+  kind: string
   note: string
   created_at: string
   event_id?: string | null
@@ -46,6 +48,7 @@ const POST_SELECT = `
   id,
   author_id,
   category,
+  kind,
   note,
   created_at,
   event_id,
@@ -63,6 +66,7 @@ function normalize(rows: any[] | null): BuildLogRow[] {
     id: p.id,
     author_id: p.author_id,
     category: p.category,
+    kind: p.kind ?? "Update",
     note: p.note,
     created_at: p.created_at,
     event_id: p.event_id ?? null,
@@ -255,7 +259,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
 
   const loadMore = useCallback(() => setLimit((l) => l + BUILD_LOG_PAGE), [])
 
-  const post = useCallback(async (category: string, note: string, projectId?: string | null, attach?: ShipAttachment) => {
+  const post = useCallback(async (category: string, note: string, projectId?: string | null, attach?: ShipAttachment, kind?: string) => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("Not authenticated")
@@ -265,6 +269,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
       .insert({
         author_id: user.id,
         category,
+        kind: kind ?? "Update",
         note,
         event_id: eventId ?? null,
         project_id: projectId ?? null,

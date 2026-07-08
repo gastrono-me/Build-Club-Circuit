@@ -3,6 +3,7 @@
 import React, { useRef, useState } from "react"
 import { Paperclip, Link2, Plus, X } from "lucide-react"
 import { WORK_CATEGORIES } from "@/types/index"
+import { SHIP_KINDS } from "@/lib/data/ship-kinds"
 import { Button } from "@/components/ui/Button"
 import { useProjects } from "@/lib/hooks/useProjects"
 import { uploadShipMedia, normalizeLink, type ShipMedia } from "@/lib/storage/shipMedia"
@@ -14,7 +15,7 @@ const NO_PROJECT = ""
 const NEW_PROJECT = "__new__"
 
 interface PostUpdateProps {
-  onPost: (category: string, note: string, projectId?: string | null, attach?: ShipAttachment) => Promise<void>
+  onPost: (category: string, note: string, projectId?: string | null, attach?: ShipAttachment, kind?: string) => Promise<void>
 }
 
 export function PostUpdate({ onPost }: PostUpdateProps) {
@@ -23,6 +24,7 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
   // costs one decision, not six. An untouched category files as "Other".
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [category, setCategory] = useState<string>("Other")
+  const [kind, setKind] = useState<string>("Update")
   const [note, setNote] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -75,7 +77,7 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
         mediaUrl: media?.url ?? null,
         mediaType: media?.type ?? null,
         mediaName: media?.name ?? null,
-      })
+      }, kind)
       setNote("")
       setLinkUrl("")
       setMedia(null)
@@ -244,6 +246,47 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
         >
           {WORK_CATEGORIES.map((tag) => (
             <option key={tag} value={tag}>{tag}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Type: Update / Feature / Milestone */}
+      <div>
+        <label
+          style={{
+            display: "block",
+            fontFamily: fonts.mono,
+            fontSize: fontSize.label,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase" as const,
+            color: colors.muted,
+            marginBottom: spacing[2],
+          }}
+        >
+          Type
+        </label>
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            fontFamily: fonts.body,
+            fontSize: fontSize.body,
+            color: colors.ink,
+            background: colors.panel,
+            border: `1px solid ${colors.line}`,
+            borderRadius: radii.md,
+            outline: "none",
+            cursor: "pointer",
+            appearance: "none" as const,
+            transition: `border-color ${motion.fast} ${motion.ease}`,
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = colors.violet }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = colors.line }}
+        >
+          {SHIP_KINDS.map((k) => (
+            <option key={k} value={k}>{k}</option>
           ))}
         </select>
       </div>

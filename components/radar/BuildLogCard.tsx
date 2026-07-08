@@ -10,6 +10,7 @@ import { useSocial } from "@/components/shell/SocialProvider"
 import { PersonButton } from "@/components/shell/PersonButton"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { ShipComments } from "@/components/radar/ShipComments"
+import { ShipKindBadge } from "@/components/radar/ShipKindBadge"
 import { useNow } from "@/lib/hooks/useNow"
 import { shipTime } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
@@ -123,7 +124,8 @@ export function BuildLogCard({
         </div>
         </PersonButton>
 
-        {/* Category tag */}
+        {/* Type badge (Feature/Milestone) + category tag */}
+        <ShipKindBadge kind={post.kind} />
         <Tag tone="go">{post.category}</Tag>
       </div>
 
