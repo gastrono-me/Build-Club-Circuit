@@ -7,6 +7,7 @@ import { Tag } from "@/components/ui/Tag"
 import { Avatar } from "@/components/shell/Avatar"
 import { FolderGit2, MessageCircle, Star } from "lucide-react"
 import { useSocial } from "@/components/shell/SocialProvider"
+import { PersonButton } from "@/components/shell/PersonButton"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { ShipComments } from "@/components/radar/ShipComments"
 import { useNow } from "@/lib/hooks/useNow"
@@ -77,6 +78,7 @@ export function BuildLogCard({
     >
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginBottom: spacing[3] }}>
+        <PersonButton person={{ id: post.author_id, name: authorName, avatar: post.author_avatar }} style={{ gap: spacing[2], flex: 1, minWidth: 0 }}>
         <Avatar name={authorName} photo={post.author_avatar} size={32} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
@@ -119,6 +121,7 @@ export function BuildLogCard({
             {shipTime(post.created_at, now)}
           </div>
         </div>
+        </PersonButton>
 
         {/* Category tag */}
         <Tag tone="go">{post.category}</Tag>

@@ -5,6 +5,7 @@ import type { BlockerRow } from "@/lib/hooks/useRadar"
 import { layoutField, similarityLinks, type Point } from "@/lib/radar/similarity"
 import { colors, fonts, fontSize, fontWeight, spacing } from "@/lib/design/tokens"
 import { EmbeddingField, type FieldLink, type FieldNode } from "@/components/field/EmbeddingField"
+import { PersonButton } from "@/components/shell/PersonButton"
 import { WORK_CATEGORY_FIELD, RADAR_AXIS_LABELS, type CategoryColorKey } from "@/lib/config/event"
 import { WORK_CATEGORIES, type WorkCategory } from "@/lib/data/work-categories"
 
@@ -169,9 +170,13 @@ export function EmbeddingPlot({
           marginBottom: spacing[3],
         }}
       >
-        {selectedBlocker.author_id == null
-          ? "Community"
-          : (selectedBlocker.author_name ?? "Builder")}
+        {selectedBlocker.author_id == null ? (
+          "Community"
+        ) : (
+          <PersonButton person={{ id: selectedBlocker.author_id, name: selectedBlocker.author_name ?? "Builder", avatar: selectedBlocker.author_avatar }} style={{ color: colors.muted, textDecoration: "underline" }}>
+            {selectedBlocker.author_name ?? "Builder"}
+          </PersonButton>
+        )}
       </div>
       <button
         type="button"

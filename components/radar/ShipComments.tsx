@@ -5,6 +5,7 @@ import { MessageSquare, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { subscribeFeed, notifyFeed, BUILD_LOG_TOPIC } from "@/lib/realtime/feedBus"
 import { Avatar } from "@/components/shell/Avatar"
+import { PersonButton } from "@/components/shell/PersonButton"
 import { relTime } from "@/components/shell/NotificationItems"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
 
@@ -148,12 +149,16 @@ export function ShipComments({
           ) : (
             comments.map((c) => (
               <div key={c.id} style={{ display: "flex", gap: spacing[2], alignItems: "flex-start" }}>
-                <Avatar name={c.author_name ?? "Builder"} photo={c.author_avatar} size={24} />
+                <PersonButton person={{ id: c.author_id, name: c.author_name ?? "Builder", avatar: c.author_avatar }}>
+                  <Avatar name={c.author_name ?? "Builder"} photo={c.author_avatar} size={24} />
+                </PersonButton>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: spacing[2] }}>
-                    <span style={{ fontFamily: fonts.body, fontSize: fontSize.meta, fontWeight: fontWeight.semibold, color: colors.ink }}>
-                      {c.author_name ?? "Builder"}
-                    </span>
+                    <PersonButton person={{ id: c.author_id, name: c.author_name ?? "Builder", avatar: c.author_avatar }}>
+                      <span style={{ fontFamily: fonts.body, fontSize: fontSize.meta, fontWeight: fontWeight.semibold, color: colors.ink }}>
+                        {c.author_name ?? "Builder"}
+                      </span>
+                    </PersonButton>
                     <span style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft }}>
                       {relTime(c.created_at)}
                     </span>

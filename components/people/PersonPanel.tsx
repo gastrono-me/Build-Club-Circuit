@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { X, Send, AlertTriangle, Check, CalendarDays } from "lucide-react"
+import { X, Send, AlertTriangle, Check, CalendarDays, Linkedin, Github, Twitter, Instagram } from "lucide-react"
 import { Avatar } from "@/components/shell/Avatar"
 import { Button } from "@/components/ui/Button"
+import { Tag } from "@/components/ui/Tag"
 import { useDirectMessages } from "@/lib/hooks/useDirectMessages"
 import { useCatchup, CATCHUP_MINUTES } from "@/lib/hooks/useCatchups"
+import { useProfileById } from "@/lib/hooks/useProfileById"
 import { useSocial, type ChatPerson } from "@/components/shell/SocialProvider"
 import { fmt, catchupWhen } from "@/lib/time"
 import { colors, radii, fonts, fontSize, fontWeight, spacing, shadows } from "@/lib/design/tokens"
@@ -14,8 +16,8 @@ const oxbloodSoft = colors.liveSoft
 
 export interface PersonPanelProps {
   person: ChatPerson
-  /** Which section to draw attention to on open — both always render. */
-  focus: "chat" | "catchup"
+  /** Which section to draw attention to on open — all always render. */
+  focus: "profile" | "chat" | "catchup"
   onClose: () => void
 }
 
@@ -23,6 +25,9 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
   const { thread, send, meId } = useDirectMessages(person.id)
   const { catchup, propose, accept, decline, cancel } = useCatchup(person.id)
   const { catchups: myCatchups } = useSocial()
+  // Fill in the full profile by id, so opening from a bare avatar (id + name
+  // only) still shows bio, skills, links, etc.
+  const { profile } = useProfileById(person.id)
 
   const [input, setInput] = useState("")
   const endRef = useRef<HTMLDivElement>(null)
@@ -33,8 +38,26 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
 
   useEffect(() => {
     if (focus === "chat") inputRef.current?.focus()
-    else catchupRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    else if (focus === "catchup") catchupRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    // "profile" is the default view; the drawer already opens scrolled to top.
   }, [focus])
+
+  // Prefer live profile fields, fall back to whatever the caller passed.
+  const occupation = profile?.occupation ?? person.occupation ?? null
+  const org = profile?.org ?? person.org ?? null
+  const tagline = profile?.tagline ?? null
+  const bio = profile?.bio ?? person.bio ?? null
+  const skills = profile?.skills ?? person.tags ?? []
+  const industries = profile?.industries ?? person.industries ?? []
+  const looking = profile?.looking ?? person.looking ?? []
+  const links = profile?.links ?? {}
+  const socials = [
+    links.linkedin && { href: links.linkedin, label: "LinkedIn", icon: <Linkedin size={14} /> },
+    links.github && { href: links.github, label: "GitHub", icon: <Github size={14} /> },
+    links.x && { href: links.x, label: "X", icon: <Twitter size={14} /> },
+    links.instagram && { href: links.instagram, label: "Instagram", icon: <Instagram size={14} /> },
+  ].filter(Boolean) as { href: string; label: string; icon: React.ReactNode }[]
+  const isMe = meId != null && meId === person.id
 
   async function submit() {
     const v = input.trim()
@@ -48,7 +71,7 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
   return (
     <div onClick={onClose} role="presentation"
       style={{ position: "fixed", inset: 0, background: "rgba(20,20,60,0.45)", backdropFilter: "blur(2px)", zIndex: 50 }}>
-      <div role="dialog" aria-modal="true" aria-label={`Conversation with ${person.name}`} onClick={e => e.stopPropagation()}
+      <div role="dialog" aria-modal="true" aria-label={`${person.name}'s profile`} onClick={e => e.stopPropagation()}
         style={{
           position: "fixed", top: 0, right: 0, bottom: 0, width: "min(92vw, 420px)",
           background: colors.surface, borderLeft: `1.5px solid ${colors.ink}`, boxShadow: shadows.modal,
@@ -66,6 +89,34 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
           <button onClick={onClose} aria-label="Close" style={{ border: "none", background: "transparent", cursor: "pointer", color: colors.muted, flexShrink: 0 }}><X size={19} /></button>
         </div>
 
+        {/* Profile block — bio, focus areas, links. Bounded + scrolls if long. */}
+        {(tagline || bio || skills.length || industries.length || looking.length || socials.length > 0) && (
+          <div style={{ padding: "14px 16px", borderBottom: `1.4px solid ${colors.line}`, flexShrink: 0, maxHeight: "42vh", overflowY: "auto" }}>
+            {tagline && (
+              <p style={{ margin: `0 0 ${spacing[2]}px`, fontFamily: fonts.body, fontStyle: "italic", fontSize: fontSize.body, color: colors.ink }}>{tagline}</p>
+            )}
+            {bio && (
+              <p style={{ margin: `0 0 ${spacing[3]}px`, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted, lineHeight: 1.55 }}>{bio}</p>
+            )}
+            {skills.length > 0 && <TagRow label="Skills" items={skills} tone="ink" />}
+            {industries.length > 0 && <TagRow label="Industries" items={industries} tone="violet" />}
+            {looking.length > 0 && <TagRow label="Looking for" items={looking} tone="go" />}
+            {socials.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: spacing[2], marginTop: spacing[3] }}>
+                {socials.map((s) => (
+                  <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: radii.pill, border: `1.3px solid ${colors.line}`, background: colors.panel, color: colors.ink, fontFamily: fonts.mono, fontSize: fontSize.label, textDecoration: "none" }}>
+                    {s.icon} {s.label}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* messaging — hidden for your own profile (can't message yourself) */}
+        {!isMe && (
+        <>
         {/* catchup status strip */}
         <div ref={catchupRef}>
           <CatchupStrip
@@ -103,6 +154,26 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
             <Send size={16} />
           </button>
         </div>
+        </>
+        )}
+
+        {isMe && (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: spacing[6], textAlign: "center", fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.mutedSoft }}>
+            This is you.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** A labeled row of tags in the profile block. */
+function TagRow({ label, items, tone }: { label: string; items: string[]; tone: "ink" | "violet" | "go" }) {
+  return (
+    <div style={{ marginBottom: spacing[3] }}>
+      <div style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, letterSpacing: "0.08em", textTransform: "uppercase", color: colors.mutedSoft, marginBottom: 6 }}>{label}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {items.map((t) => <Tag key={t} tone={tone}>{t}</Tag>)}
       </div>
     </div>
   )

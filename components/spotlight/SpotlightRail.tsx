@@ -8,6 +8,7 @@ import { Tag } from "@/components/ui/Tag"
 import { selectSpotlight } from "@/lib/spotlight/rotation"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { ShipComments } from "@/components/radar/ShipComments"
+import { PersonButton } from "@/components/shell/PersonButton"
 import { shipTime } from "@/lib/time"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
@@ -150,15 +151,17 @@ export function SpotlightRail({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: spacing[3], marginBottom: spacing[3] }}>
-          <Avatar name={featured.author_name ?? "Builder"} photo={featured.author_avatar} size={40} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: fonts.body, fontWeight: fontWeight.semibold, fontSize: fontSize.body, color: colors.ink, lineHeight: 1.2 }}>
-              {featured.author_name ?? "Builder"}
+          <PersonButton person={{ id: featured.author_id, name: featured.author_name ?? "Builder", avatar: featured.author_avatar }} style={{ gap: spacing[3], flex: 1, minWidth: 0 }}>
+            <Avatar name={featured.author_name ?? "Builder"} photo={featured.author_avatar} size={40} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: fonts.body, fontWeight: fontWeight.semibold, fontSize: fontSize.body, color: colors.ink, lineHeight: 1.2 }}>
+                {featured.author_name ?? "Builder"}
+              </div>
+              <div style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft, marginTop: 2 }}>
+                {shipTime(featured.created_at, now)}
+              </div>
             </div>
-            <div style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft, marginTop: 2 }}>
-              {shipTime(featured.created_at, now)}
-            </div>
-          </div>
+          </PersonButton>
           <Tag tone="go">{featured.category}</Tag>
         </div>
 

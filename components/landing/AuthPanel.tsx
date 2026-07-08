@@ -41,13 +41,13 @@ export function AuthPanel({ open, onClose }: { open: boolean; onClose: () => voi
     setState(error ? "error" : "sent")
   }
 
-  async function handleOAuth(provider: "google" | "github") {
+  async function handleOAuth(provider: "google") {
     setOauthMsg(null)
     const supabase = createClient()
     const redirectTo = `${window.location.origin}/auth/callback`
     const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } })
     if (error) {
-      setOauthMsg(`${provider === "google" ? "Google" : "GitHub"} sign-in isn't enabled yet. Use the email link above.`)
+      setOauthMsg("Google sign-in isn't enabled yet. Use the email link above.")
     }
   }
 
@@ -179,7 +179,6 @@ export function AuthPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
             <div style={{ display: "flex", flexDirection: "column", gap: spacing[2] }}>
               <Button variant="secondary" full onClick={() => handleOAuth("google")}>Continue with Google</Button>
-              <Button variant="secondary" full onClick={() => handleOAuth("github")}>Continue with GitHub</Button>
             </div>
 
             {oauthMsg && (

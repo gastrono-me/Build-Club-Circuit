@@ -9,6 +9,7 @@ import { EmbeddingField, type FieldLink, type FieldNode } from "@/components/fie
 import { WORK_CATEGORY_FIELD, RADAR_AXIS_LABELS, type CategoryColorKey } from "@/lib/config/event"
 import { WORK_CATEGORIES, type WorkCategory } from "@/lib/data/work-categories"
 import { useSocial } from "@/components/shell/SocialProvider"
+import { PersonButton } from "@/components/shell/PersonButton"
 import { shipTime } from "@/lib/time"
 
 const COLOR_TOKENS: Record<CategoryColorKey, string> = {
@@ -155,7 +156,9 @@ export function ShipsPlot({ posts, cheerCounts, mineCheers, userId, onCheer }: S
           marginBottom: spacing[3],
         }}
       >
-        {selected.author_name ?? "Builder"} · {shipTime(selected.created_at, new Date())}
+        <PersonButton person={{ id: selected.author_id, name: selected.author_name ?? "Builder", avatar: selected.author_avatar }} style={{ color: colors.muted, textDecoration: "underline" }}>
+          {selected.author_name ?? "Builder"}
+        </PersonButton>{" "}· {shipTime(selected.created_at, new Date())}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: spacing[2], flexWrap: "wrap" }}>
         <button

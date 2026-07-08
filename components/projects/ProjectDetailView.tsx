@@ -10,6 +10,7 @@ import { SectionTitle } from "@/components/ui/SectionTitle"
 import { Tag } from "@/components/ui/Tag"
 import { Input } from "@/components/ui/Input"
 import { Avatar } from "@/components/shell/Avatar"
+import { PersonButton } from "@/components/shell/PersonButton"
 import { Button } from "@/components/ui/Button"
 import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
 import { LinksEditor } from "@/components/projects/LinksEditor"
@@ -346,10 +347,10 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           }}
         >
           {project.owner_name && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <PersonButton person={{ id: project.owner_id, name: project.owner_name, avatar: project.owner_avatar }} style={{ gap: 6, color: colors.muted }}>
               <Avatar name={project.owner_name} photo={project.owner_avatar} size={20} />
               {project.owner_name}
-            </span>
+            </PersonButton>
           )}
           <span>started {shipDate(project.created_at, now)}</span>
           <span style={{ color: colors.go }}>{ships.length}{hasMore ? "+" : ""} ship{ships.length === 1 ? "" : "s"}</span>
@@ -478,10 +479,10 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                       </span>
                       <Tag tone="go">{s.category}</Tag>
                       {s.author_name && (
-                        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted }}>
+                        <PersonButton person={{ id: s.author_id, name: s.author_name, avatar: s.author_avatar }} style={{ marginLeft: "auto", gap: 6, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted }}>
                           <Avatar name={s.author_name} photo={s.author_avatar} size={18} />
                           {s.author_name}
-                        </span>
+                        </PersonButton>
                       )}
                     </div>
                     <p style={{ margin: 0, fontFamily: fonts.body, fontSize: fontSize.body, color: colors.ink, lineHeight: 1.55 }}>

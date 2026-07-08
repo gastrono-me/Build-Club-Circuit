@@ -9,6 +9,7 @@ import { IconButtonWithTooltip } from "@/components/ui/IconButtonWithTooltip"
 import { Avatar } from "@/components/shell/Avatar"
 import { matchScore } from "@/lib/match"
 import { useSocial } from "@/components/shell/SocialProvider"
+import { PersonButton } from "@/components/shell/PersonButton"
 import type { Profile } from "@/types/index"
 import {
   colors, fonts, fontSize, fontWeight, spacing, radii,
@@ -102,8 +103,9 @@ export function PersonCard({ person, me, reason, isSelf }: PersonCardProps) {
 
   return (
     <Card spine={person.isReal ? "violet" : "none"}>
-      {/* Top row: avatar + name + occupation */}
+      {/* Top row: avatar + name + occupation — opens the profile popup */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: spacing[3], marginBottom: spacing[3] }}>
+        <PersonButton person={{ id: person.id, name: person.name, avatar: person.avatar }} style={{ gap: spacing[3], flex: 1, minWidth: 0, alignItems: "flex-start" }}>
         <Avatar name={person.name} photo={person.avatar} size={44} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
@@ -133,6 +135,7 @@ export function PersonCard({ person, me, reason, isSelf }: PersonCardProps) {
             {person.occupation}
           </div>
         </div>
+        </PersonButton>
       </div>
 
       {/* Skill tags — capped so cards with very different tag counts stay roughly the same height */}

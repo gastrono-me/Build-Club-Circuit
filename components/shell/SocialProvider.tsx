@@ -25,7 +25,7 @@ interface SocialApi {
   /** Catchups someone proposed to me that I haven't accepted/declined yet — the catchup equivalent of an unread message. */
   pendingCatchups: CatchupAgendaRow[]
   cancelCatchup: (catchupId: string) => void
-  openPanel: (p: ChatPerson, focus: "chat" | "catchup") => void
+  openPanel: (p: ChatPerson, focus?: "profile" | "chat" | "catchup") => void
   inbox: InboxConversation[]
   totalUnread: number
   markRead: (otherId: string) => void
@@ -44,7 +44,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   const { conversations: inbox, totalUnread, markRead } = useInbox()
   const { activity, unreadActivity, markActivityRead } = useActivity()
   const [panelPerson, setPanelPerson] = useState<ChatPerson | null>(null)
-  const [panelFocus, setPanelFocus] = useState<"chat" | "catchup">("chat")
+  const [panelFocus, setPanelFocus] = useState<"profile" | "chat" | "catchup">("profile")
 
   const pendingCatchups = catchups.filter(c => c.direction === "received" && c.status === "proposed")
 
@@ -52,7 +52,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     catchups,
     pendingCatchups,
     cancelCatchup,
-    openPanel: (p, focus) => {
+    // Clicking a person anywhere opens their profile; chat/catchup deep-link
+    // the same drawer to those sections.
+    openPanel: (p, focus = "profile") => {
       if (focus === "chat") markRead(p.id)
       setPanelPerson(p)
       setPanelFocus(focus)

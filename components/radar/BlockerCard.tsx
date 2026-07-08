@@ -6,9 +6,16 @@ import { Button } from "@/components/ui/Button"
 import { Tag } from "@/components/ui/Tag"
 import { Avatar } from "@/components/shell/Avatar"
 import { MessageCircle } from "lucide-react"
-import { useSocial } from "@/components/shell/SocialProvider"
+import { useSocial, type ChatPerson } from "@/components/shell/SocialProvider"
+import { PersonButton } from "@/components/shell/PersonButton"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
 import type { BlockerRow } from "@/lib/hooks/useRadar"
+
+/** Wrap the header in a profile-opening button, unless the post is anonymous. */
+function MaybePerson({ enabled, person, children }: { enabled: boolean; person: ChatPerson; children: React.ReactNode }) {
+  if (!enabled) return <div style={{ display: "flex", alignItems: "center", gap: spacing[2], flex: 1, minWidth: 0 }}>{children}</div>
+  return <PersonButton person={person} style={{ gap: spacing[2], flex: 1, minWidth: 0 }}>{children}</PersonButton>
+}
 
 interface BlockerCardProps {
   blocker: BlockerRow
@@ -59,8 +66,12 @@ export function BlockerCard({
 
   return (
     <Card spine="live" padding={spacing[4]}>
-      {/* Header row */}
+      {/* Header row — clickable to the author's profile, unless anonymous */}
       <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginBottom: spacing[3] }}>
+        <MaybePerson
+          enabled={!isAnonymous && !!blocker.author_id}
+          person={{ id: blocker.author_id ?? "", name: authorName, avatar: blocker.author_avatar }}
+        >
         <Avatar
           name={authorName}
           photo={isAnonymous ? undefined : blocker.author_avatar}
@@ -106,6 +117,7 @@ export function BlockerCard({
             {timeAgo(blocker.created_at)}
           </div>
         </div>
+        </MaybePerson>
 
         {/* Category tag */}
         <Tag tone="live">{blocker.category}</Tag>
