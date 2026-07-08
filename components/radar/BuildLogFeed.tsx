@@ -6,6 +6,7 @@ import { Search, X } from "lucide-react"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { useSpotlightNominations } from "@/lib/hooks/useSpotlightNominations"
 import { WORK_CATEGORIES } from "@/lib/data/work-categories"
+import { SHIP_KINDS } from "@/lib/data/ship-kinds"
 import { PostUpdate } from "@/components/radar/PostUpdate"
 import { BuildLogCard } from "@/components/radar/BuildLogCard"
 import { ShipsPlot } from "@/components/radar/ShipsPlot"
@@ -26,9 +27,10 @@ const DEEP_LINK_MAX_PAGES = 3
  * list. Same instrument, other polarity.
  */
 export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | null; compose?: boolean } = {}) {
-  // Filters: category chip + builder-name search, both applied server-side.
-  // They drive the field and the list together (same filtered set).
+  // Filters: category chip + type chip + builder-name search, all applied
+  // server-side. They drive the field and the list together (same set).
   const [category, setCategory] = React.useState<string | null>(null)
+  const [kind, setKind] = React.useState<string | null>(null)
   const [authorInput, setAuthorInput] = React.useState("")
   const [author, setAuthor] = React.useState<string | null>(null)
 
@@ -37,11 +39,11 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
     return () => clearTimeout(t)
   }, [authorInput])
 
-  const { posts, loading, post, toggleCheer, cheerCounts, commentCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId, { category, author })
+  const { posts, loading, post, toggleCheer, cheerCounts, commentCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId, { category, kind, author })
   const { mine: nominated, nominate, unnominate } = useSpotlightNominations()
 
-  const filtering = !!category || !!author
-  const clearFilters = () => { setCategory(null); setAuthorInput(""); setAuthor(null) }
+  const filtering = !!category || !!kind || !!author
+  const clearFilters = () => { setCategory(null); setKind(null); setAuthorInput(""); setAuthor(null) }
 
   // Dim the list while a filter change is refetching, so results never look
   // current when they aren't. Cleared as soon as new posts land.
@@ -50,7 +52,7 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
   React.useEffect(() => {
     if (filterMountRef.current) setFilterPending(true)
     filterMountRef.current = true
-  }, [category, author])
+  }, [category, kind, author])
   React.useEffect(() => {
     setFilterPending(false)
   }, [posts])
@@ -156,12 +158,19 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
 
       {compose && <PostUpdate onPost={post} />}
 
-      {/* Filters: work category + builder name (drive the field and the list) */}
+      {/* Filters: work category + type + builder name (drive field and list) */}
       <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: spacing[2] }}>
           <FilterChip label="All" active={!category} onClick={() => setCategory(null)} />
           {WORK_CATEGORIES.map((c) => (
             <FilterChip key={c} label={c} active={category === c} onClick={() => setCategory(category === c ? null : c)} />
+          ))}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: spacing[2], alignItems: "center" }}>
+          <span style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, letterSpacing: "0.08em", textTransform: "uppercase", color: colors.mutedSoft, marginRight: 2 }}>Type</span>
+          <FilterChip label="All" active={!kind} onClick={() => setKind(null)} />
+          {SHIP_KINDS.map((k) => (
+            <FilterChip key={k} label={k} active={kind === k} onClick={() => setKind(kind === k ? null : k)} />
           ))}
         </div>
         <div

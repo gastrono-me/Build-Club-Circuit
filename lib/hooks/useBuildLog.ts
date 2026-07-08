@@ -107,6 +107,8 @@ function startOfUtcDayISO(): string {
 export interface BuildLogFilter {
   /** Exact work category, or null for all. */
   category?: string | null
+  /** Exact ship type (Update/Feature/Milestone), or null for all. */
+  kind?: string | null
   /** Case-insensitive author-name fragment, or null for everyone. */
   author?: string | null
   /**
@@ -120,6 +122,7 @@ export interface BuildLogFilter {
 export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
   // Primitive deps so callers can pass a fresh object literal each render.
   const filterCategory = filter?.category ?? null
+  const filterKind = filter?.kind ?? null
   const filterAuthor = filter?.author?.trim() || null
   const browse = filter?.browse ?? true
 
@@ -137,7 +140,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
   // A new filter restarts pagination at page one.
   useEffect(() => {
     setLimit(BUILD_LOG_PAGE)
-  }, [filterCategory, filterAuthor])
+  }, [filterCategory, filterKind, filterAuthor])
 
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
@@ -158,6 +161,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
         .limit(limit)
       if (eventId) pageQuery = pageQuery.eq("event_id", eventId)
       if (filterCategory) pageQuery = pageQuery.eq("category", filterCategory)
+      if (filterKind) pageQuery = pageQuery.eq("kind", filterKind)
       if (filterAuthor) pageQuery = pageQuery.ilike("profiles.name", `%${filterAuthor}%`)
     }
 
@@ -230,7 +234,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
     setCommentCounts(comments)
     setMineCheers(mine)
     setLoading(false)
-  }, [eventId, limit, filterCategory, filterAuthor, browse])
+  }, [eventId, limit, filterCategory, filterKind, filterAuthor, browse])
 
   // Keep the refetch pointing at the latest fetch (which closes over eventId +
   // limit) without re-subscribing the broadcast channel each time those change.

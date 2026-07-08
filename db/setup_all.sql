@@ -826,6 +826,15 @@ create or replace view public.project_ship_kind_counts
 
 grant select on public.project_ship_kind_counts to authenticated;
 
+-- 025 author ship tally: per-builder, per-kind counts for the profile popup.
+create or replace view public.author_ship_kind_counts
+  with (security_invoker = on) as
+  select author_id, kind, count(*)::int as count
+  from public.build_log
+  group by author_id, kind;
+
+grant select on public.author_ship_kind_counts to authenticated;
+
 
 -- ─────────────────────────────────────────────────────────
 -- db/migrations/023_admins.sql

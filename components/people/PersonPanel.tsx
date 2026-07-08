@@ -9,6 +9,7 @@ import { Tag } from "@/components/ui/Tag"
 import { useDirectMessages } from "@/lib/hooks/useDirectMessages"
 import { useCatchup, CATCHUP_MINUTES } from "@/lib/hooks/useCatchups"
 import { useProfileById } from "@/lib/hooks/useProfileById"
+import { useShipTally } from "@/lib/hooks/useShipTally"
 import { useSocial, type ChatPerson } from "@/components/shell/SocialProvider"
 import { fmt, catchupWhen } from "@/lib/time"
 import { colors, radii, fonts, fontSize, fontWeight, spacing, shadows } from "@/lib/design/tokens"
@@ -29,6 +30,7 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
   // Fill in the full profile by id, so opening from a bare avatar (id + name
   // only) still shows bio, skills, links, etc.
   const { profile } = useProfileById(person.id)
+  const { total: shipTotal, parts: shipParts } = useShipTally(person.id)
 
   const [input, setInput] = useState("")
   const endRef = useRef<HTMLDivElement>(null)
@@ -90,9 +92,21 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
           <button onClick={onClose} aria-label="Close" style={{ border: "none", background: "transparent", cursor: "pointer", color: colors.muted, flexShrink: 0 }}><X size={19} /></button>
         </div>
 
-        {/* Profile block — bio, focus areas, links. Bounded + scrolls if long. */}
-        {(tagline || bio || skills.length || industries.length || looking.length || socials.length > 0) && (
+        {/* Profile block — tally, bio, focus areas, links. Bounded + scrolls if long. */}
+        {(shipTotal > 0 || tagline || bio || skills.length || industries.length || looking.length || socials.length > 0) && (
           <div style={{ padding: "14px 16px", borderBottom: `1.4px solid ${colors.line}`, flexShrink: 0, maxHeight: "42vh", overflowY: "auto" }}>
+            {shipTotal > 0 && (
+              <div style={{ marginBottom: spacing[3] }}>
+                <div style={{ fontFamily: fonts.body, fontSize: fontSize.body, fontWeight: fontWeight.semibold, color: colors.ink }}>
+                  {shipTotal} ship{shipTotal === 1 ? "" : "s"}
+                </div>
+                {shipParts.length > 0 && (
+                  <div style={{ fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted, marginTop: 2 }}>
+                    {shipParts.join(" · ")}
+                  </div>
+                )}
+              </div>
+            )}
             {tagline && (
               <p style={{ margin: `0 0 ${spacing[2]}px`, fontFamily: fonts.body, fontStyle: "italic", fontSize: fontSize.body, color: colors.ink }}>{tagline}</p>
             )}
