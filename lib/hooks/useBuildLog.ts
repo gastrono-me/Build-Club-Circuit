@@ -263,11 +263,14 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
 
   const loadMore = useCallback(() => setLimit((l) => l + BUILD_LOG_PAGE), [])
 
-  const post = useCallback(async (category: string, note: string, projectId?: string | null, attach?: ShipAttachment, kind?: string) => {
+  const post = useCallback(async (category: string, note: string, projectId?: string | null, attach?: ShipAttachment, kind?: string, eventIdOverride?: string | null) => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("Not authenticated")
 
+    // Undefined override = fall back to the hook's scope (event pages); an
+    // explicit value (or null) from the composer wins (Today's event toggle).
+    const finalEvent = eventIdOverride !== undefined ? eventIdOverride : (eventId ?? null)
     const { error } = await supabase
       .from("build_log")
       .insert({
@@ -275,7 +278,7 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
         category,
         kind: kind ?? "Update",
         note,
-        event_id: eventId ?? null,
+        event_id: finalEvent,
         project_id: projectId ?? null,
         link_url: attach?.linkUrl ?? null,
         media_url: attach?.mediaUrl ?? null,

@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react"
 import Link from "next/link"
-import { Flame, Check, LifeBuoy, ArrowRight } from "lucide-react"
+import { Flame, Check, LifeBuoy, ArrowRight, CalendarClock } from "lucide-react"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { useProfile } from "@/lib/hooks/useProfile"
 import { useNow } from "@/lib/hooks/useNow"
@@ -13,6 +13,7 @@ import { PostBlocker } from "@/components/radar/PostBlocker"
 import { SpotlightRail } from "@/components/spotlight/SpotlightRail"
 import { MyProjectsStrip } from "@/components/projects/MyProjectsStrip"
 import { UpcomingEventsStrip } from "@/components/events/UpcomingEventsStrip"
+import { useActiveEvent } from "@/lib/hooks/useActiveEvent"
 import { useSocial } from "@/components/shell/SocialProvider"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
 
@@ -37,6 +38,9 @@ export function TodayView() {
   // Client-only (no hydration mismatch) and ticking, so the streak and the
   // spotlight timestamps stay honest while the tab sits open.
   const now = useNow()
+
+  // A live event you're in: the daily ship can attribute to it.
+  const { active: activeEvent } = useActiveEvent(now)
 
   const streak = useMemo(() => {
     if (!now) return null
@@ -121,7 +125,31 @@ export function TodayView() {
             ? "Streak is safe. Log another win if the day kept moving."
             : "Log one thing you got working today to keep your streak alive."}
         </p>
-        <PostUpdate onPost={post} />
+
+        {activeEvent && (
+          <Link
+            href={`/events/${activeEvent.slug}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: spacing[2],
+              marginBottom: spacing[3],
+              padding: `${spacing[2]}px ${spacing[3]}px`,
+              borderRadius: radii.md,
+              background: colors.goSoft,
+              border: `1.4px solid ${colors.go}`,
+              textDecoration: "none",
+              fontFamily: fonts.body,
+              fontSize: fontSize.meta,
+              color: colors.ink,
+            }}
+          >
+            <CalendarClock size={15} color={colors.go} style={{ flexShrink: 0 }} />
+            <span>You&rsquo;re in <strong style={{ fontWeight: fontWeight.semibold }}>{activeEvent.name}</strong> — ships count toward it while it&rsquo;s live.</span>
+          </Link>
+        )}
+
+        <PostUpdate onPost={post} activeEvent={activeEvent ? { id: activeEvent.id, name: activeEvent.name } : null} />
 
         {/* Stuck action — being stuck is a "today" feeling; browsing blockers is on Explore */}
         {stuckOpen ? (

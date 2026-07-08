@@ -15,10 +15,14 @@ const NO_PROJECT = ""
 const NEW_PROJECT = "__new__"
 
 interface PostUpdateProps {
-  onPost: (category: string, note: string, projectId?: string | null, attach?: ShipAttachment, kind?: string) => Promise<void>
+  onPost: (category: string, note: string, projectId?: string | null, attach?: ShipAttachment, kind?: string, eventId?: string | null) => Promise<void>
+  /** When set, offer to attribute this ship to a live event you're in. */
+  activeEvent?: { id: string; name: string } | null
 }
 
-export function PostUpdate({ onPost }: PostUpdateProps) {
+export function PostUpdate({ onPost, activeEvent = null }: PostUpdateProps) {
+  // While you're in a live event, ships count toward it by default.
+  const [countTowardEvent, setCountTowardEvent] = useState(true)
   // The daily ritual is note-first: one box, one button. Category, project,
   // link, and file live behind a single "Add details" reveal so logging a ship
   // costs one decision, not six. An untouched category files as "Other".
@@ -72,12 +76,15 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
         setProjectChoice(created.id)
         setNewProjectName("")
       }
+      // Only override the event when Today offers one; on event pages the hook
+      // already scopes the ship (pass undefined = use its scope).
+      const eventId = activeEvent ? (countTowardEvent ? activeEvent.id : null) : undefined
       await onPost(category, note.trim(), projectId, {
         linkUrl: normalizeLink(linkUrl),
         mediaUrl: media?.url ?? null,
         mediaType: media?.type ?? null,
         mediaName: media?.name ?? null,
-      }, kind)
+      }, kind, eventId)
       setNote("")
       setLinkUrl("")
       setMedia(null)
@@ -443,6 +450,19 @@ export function PostUpdate({ onPost }: PostUpdateProps) {
         )}
       </div>
         </>
+      )}
+
+      {/* Event attribution — only while you're in a live event */}
+      {activeEvent && (
+        <label style={{ display: "flex", alignItems: "center", gap: spacing[2], cursor: "pointer", fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted }}>
+          <input
+            type="checkbox"
+            checked={countTowardEvent}
+            onChange={(e) => setCountTowardEvent(e.target.checked)}
+            style={{ accentColor: colors.violet, width: 15, height: 15, cursor: "pointer" }}
+          />
+          Count this toward <strong style={{ color: colors.ink, fontWeight: fontWeight.semibold }}>{activeEvent.name}</strong>
+        </label>
       )}
 
       {error && (
