@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { X, Send, AlertTriangle, Check, CalendarDays, Linkedin, Github, Twitter, Instagram } from "lucide-react"
+import Link from "next/link"
+import { X, Send, AlertTriangle, Check, CalendarDays, Linkedin, Github, Twitter, Instagram, Pencil } from "lucide-react"
 import { Avatar } from "@/components/shell/Avatar"
 import { Button } from "@/components/ui/Button"
 import { Tag } from "@/components/ui/Tag"
@@ -158,8 +159,11 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
         )}
 
         {isMe && (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: spacing[6], textAlign: "center", fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.mutedSoft }}>
-            This is you.
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: spacing[3], padding: spacing[6], textAlign: "center" }}>
+            <span style={{ fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.mutedSoft }}>This is how your profile looks to others.</span>
+            <Link href="/profile" onClick={onClose} style={{ textDecoration: "none" }}>
+              <Button variant="secondary" size="sm" icon={<Pencil size={14} />}>Edit profile</Button>
+            </Link>
           </div>
         )}
       </div>
