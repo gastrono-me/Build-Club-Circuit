@@ -245,7 +245,7 @@ export function BlockerCard({
           </button>
         )}
 
-        {isOwn && onDelete && (
+        {onDelete && (
           confirmDelete ? (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
               <button
@@ -254,7 +254,7 @@ export function BlockerCard({
                 disabled={busy}
                 style={ownerBtnStyle(colors.live, colors.live, busy)}
               >
-                <Trash2 size={13} /> {busy ? "Deleting…" : "Confirm delete"}
+                <Trash2 size={13} /> {busy ? "Removing…" : isOwn ? "Confirm delete" : "Remove blocker"}
               </button>
               <button
                 type="button"
@@ -269,11 +269,11 @@ export function BlockerCard({
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              title="Delete this blocker"
-              aria-label="Delete blocker"
-              style={{ display: "inline-flex", alignItems: "center", border: `1.4px solid ${colors.line}`, background: colors.surface, color: colors.muted, borderRadius: radii.md, padding: "6px 9px", cursor: "pointer" }}
+              title={isOwn ? "Delete this blocker" : "Remove this blocker (admin)"}
+              aria-label={isOwn ? "Delete blocker" : "Remove blocker (admin)"}
+              style={{ display: "inline-flex", alignItems: "center", gap: isOwn ? 0 : 5, border: `1.4px solid ${isOwn ? colors.line : colors.live}`, background: colors.surface, color: isOwn ? colors.muted : colors.live, borderRadius: radii.md, padding: "6px 9px", fontFamily: fonts.mono, fontSize: fontSize.label, cursor: "pointer" }}
             >
-              <Trash2 size={13} />
+              <Trash2 size={13} />{!isOwn && " Remove"}
             </button>
           )
         )}

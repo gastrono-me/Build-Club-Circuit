@@ -889,6 +889,16 @@ drop policy if exists events_delete_admin on public.events;
 create policy events_delete_admin on public.events
   for delete to authenticated using (public.is_admin());
 
+-- Admin moderation (030): staff can delete any ship or blocker. Additional
+-- permissive delete policies alongside the *_delete_own ones (RLS OR-combines),
+-- so a row is deletable by its author or an admin.
+drop policy if exists build_log_delete_admin on public.build_log;
+create policy build_log_delete_admin on public.build_log
+  for delete to authenticated using (public.is_admin());
+drop policy if exists blockers_delete_admin on public.blockers;
+create policy blockers_delete_admin on public.blockers
+  for delete to authenticated using (public.is_admin());
+
 
 -- ─────────────────────────────────────────────────────────
 -- db/migrations/022_evergreen_data.sql (remap only)
@@ -912,15 +922,9 @@ update public.build_log set category = 'Other'   where category = 'Getting unstu
 -- ─────────────────────────────────────────────────────────
 -- db/seed.sql
 -- ─────────────────────────────────────────────────────────
--- seed: a few starter blockers so the stuck feed is never empty (community/seed
--- posts, no author). Discipline-spanning on purpose.
-insert into public.blockers (author_id, category, note) values
-  (null, 'Engineering', 'OAuth redirect loops forever on mobile Safari. Third day on this.'),
-  (null, 'Product',     'People sign up, poke around once, and never come back. Cannot tell which feature is supposed to hook them.'),
-  (null, 'Growth',      'Landing page converts at under 1 percent. Not sure if it is the copy or the audience.'),
-  (null, 'Sales',       'Demos go great, then the deal goes quiet. Following up without being annoying is a skill I do not have yet.'),
-  (null, 'Fundraising', '3-minute pitch is still 6 minutes of jargon. Need to cut it down hard.')
-on conflict do nothing;
+-- Blockers are not seeded: the stuck feed shows only real builder posts. (An
+-- earlier build seeded null-author "community" blockers; migration 029 removed
+-- them from live data, and this fresh-install script no longer adds them.)
 
 -- seed events as episodes: one live now, one upcoming. Dates are relative to
 -- now() so the Events page always shows a useful mix. created_by is null (no

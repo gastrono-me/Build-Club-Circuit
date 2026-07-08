@@ -4,6 +4,7 @@ import React from "react"
 import { useSearchParams } from "next/navigation"
 import { Search, X } from "lucide-react"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
+import { useIsAdmin } from "@/lib/hooks/useIsAdmin"
 import { useSpotlightNominations } from "@/lib/hooks/useSpotlightNominations"
 import { WORK_CATEGORIES } from "@/lib/data/work-categories"
 import { SHIP_KINDS } from "@/lib/data/ship-kinds"
@@ -41,6 +42,7 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
 
   const { posts, loading, post, update, remove, toggleCheer, cheerCounts, commentCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId, { category, kind, author })
   const { mine: nominated, nominate, unnominate } = useSpotlightNominations()
+  const { isAdmin } = useIsAdmin()
 
   const filtering = !!category || !!kind || !!author
   const clearFilters = () => { setCategory(null); setKind(null); setAuthorInput(""); setAuthor(null) }
@@ -307,7 +309,7 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
                     highlight={isTarget}
                     defaultOpenComments={isTarget && openComments}
                     onEdit={isOwn ? (patch) => update(p.id, patch) : undefined}
-                    onDelete={isOwn ? () => remove(p.id) : undefined}
+                    onDelete={isOwn || isAdmin ? () => remove(p.id) : undefined}
                     onToggleNominate={
                       isOwn
                         ? () =>

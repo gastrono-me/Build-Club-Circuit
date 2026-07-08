@@ -2,6 +2,7 @@
 
 import React from "react"
 import { useRadar } from "@/lib/hooks/useRadar"
+import { useIsAdmin } from "@/lib/hooks/useIsAdmin"
 import { PostBlocker } from "@/components/radar/PostBlocker"
 import { BlockerCard } from "@/components/radar/BlockerCard"
 import { EmbeddingPlot } from "@/components/radar/EmbeddingPlot"
@@ -16,6 +17,7 @@ export function RadarFeed({ eventId, compose = true }: { eventId?: string | null
   // Shipped leads: Explore is a ships-first archive; Stuck is the help lens.
   const [tab, setTab] = React.useState<FeedTab>("shipped")
   const { blockers, loading, post, toggleMeToo, resolve, remove, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore } = useRadar(eventId)
+  const { isAdmin } = useIsAdmin()
 
   // The field is the live "who's stuck" lens, so it plots only unresolved
   // blockers. The list shows everything but sinks resolved ones to the bottom.
@@ -243,7 +245,7 @@ export function RadarFeed({ eventId, compose = true }: { eventId?: string | null
                   currentUserId={userId}
                   onMeToo={() => toggleMeToo(blocker.id)}
                   onResolve={isOwn ? (resolved) => resolve(blocker.id, resolved) : undefined}
-                  onDelete={isOwn ? () => remove(blocker.id) : undefined}
+                  onDelete={isOwn || isAdmin ? () => remove(blocker.id) : undefined}
                 />
               )
             })}
