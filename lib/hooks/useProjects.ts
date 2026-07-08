@@ -8,6 +8,7 @@ export interface ProjectRow {
   owner_id: string
   name: string
   tagline: string | null
+  stage: string | null
   links: string[]
   industries: string[]
   tags: string[]
@@ -46,7 +47,7 @@ export function useProjects() {
     const [projRes, countRes] = await Promise.all([
       supabase
         .from("projects")
-        .select("id, owner_id, name, tagline, links, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
+        .select("id, owner_id, name, tagline, stage, links, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
         .order("created_at", { ascending: false }),
       supabase.from("project_ship_counts").select("project_id, ships, last_ship"),
     ])
@@ -65,6 +66,7 @@ export function useProjects() {
         owner_id: p.owner_id,
         name: p.name,
         tagline: p.tagline ?? null,
+        stage: p.stage ?? null,
         links: p.links ?? [],
         industries: p.industries ?? [],
         tags: p.tags ?? [],
@@ -82,7 +84,7 @@ export function useProjects() {
     fetchAll()
   }, [fetchAll])
 
-  const create = useCallback(async (name: string, tagline?: string, labels?: ProjectLabels, links?: string[]): Promise<ProjectRow> => {
+  const create = useCallback(async (name: string, tagline?: string, labels?: ProjectLabels, links?: string[], stage?: string | null): Promise<ProjectRow> => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("Not authenticated")
@@ -93,15 +95,16 @@ export function useProjects() {
         owner_id: user.id,
         name: name.trim(),
         tagline: tagline?.trim() || null,
+        stage: stage || null,
         links: links ?? [],
         industries: labels?.industries ?? [],
         tags: labels?.tags ?? [],
       })
-      .select("id, owner_id, name, tagline, links, industries, tags, created_at")
+      .select("id, owner_id, name, tagline, stage, links, industries, tags, created_at")
       .single()
     if (error) throw error
 
-    const row: ProjectRow = { ...(data as any), links: (data as any).links ?? [], owner_name: null, owner_avatar: null, ships: 0, last_ship: null }
+    const row: ProjectRow = { ...(data as any), stage: (data as any).stage ?? null, links: (data as any).links ?? [], owner_name: null, owner_avatar: null, ships: 0, last_ship: null }
     setProjects((prev) => [row, ...prev])
     return row
   }, [])

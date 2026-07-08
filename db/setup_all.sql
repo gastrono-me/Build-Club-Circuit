@@ -835,6 +835,10 @@ create or replace view public.author_ship_kind_counts
 
 grant select on public.author_ship_kind_counts to authenticated;
 
+-- 026 project stage: single lifecycle value per project (Idea…Scaling).
+alter table public.projects
+  add column if not exists stage text;
+
 
 -- ─────────────────────────────────────────────────────────
 -- db/migrations/023_admins.sql

@@ -15,6 +15,8 @@ import { PersonButton } from "@/components/shell/PersonButton"
 import { Button } from "@/components/ui/Button"
 import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
 import { LinksEditor } from "@/components/projects/LinksEditor"
+import { ProjectStageBadge } from "@/components/projects/ProjectStageBadge"
+import { StageSelect } from "@/components/projects/StageSelect"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { ShipComments } from "@/components/radar/ShipComments"
 import { ShipKindBadge } from "@/components/radar/ShipKindBadge"
@@ -49,6 +51,7 @@ interface ProjectMeta {
   owner_id: string
   name: string
   tagline: string | null
+  stage: string | null
   links: string[]
   industries: string[]
   tags: string[]
@@ -95,6 +98,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState("")
   const [editTagline, setEditTagline] = useState("")
+  const [editStage, setEditStage] = useState("")
   const [editLinks, setEditLinks] = useState<string[]>([])
   const [editIndustries, setEditIndustries] = useState<string[]>([])
   const [editTags, setEditTags] = useState<string[]>([])
@@ -110,7 +114,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     const [projRes, shipRes] = await Promise.all([
       supabase
         .from("projects")
-        .select("id, owner_id, name, tagline, links, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
+        .select("id, owner_id, name, tagline, stage, links, industries, tags, created_at, profiles:owner_id ( name, avatar_url )")
         .eq("id", projectId)
         .maybeSingle(),
       supabase
@@ -135,6 +139,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       owner_id: p.owner_id,
       name: p.name,
       tagline: p.tagline ?? null,
+      stage: p.stage ?? null,
       links: p.links ?? [],
       industries: p.industries ?? [],
       tags: p.tags ?? [],
@@ -215,6 +220,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     if (!project) return
     setEditName(project.name)
     setEditTagline(project.tagline ?? "")
+    setEditStage(project.stage ?? "")
     setEditLinks(project.links.length ? project.links : [""])
     setEditIndustries(project.industries)
     setEditTags(project.tags)
@@ -242,6 +248,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         .update({
           name: editName.trim(),
           tagline: editTagline.trim() || null,
+          stage: editStage || null,
           links,
           industries: editIndustries,
           tags: editTags,
@@ -252,6 +259,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         ...project,
         name: editName.trim(),
         tagline: editTagline.trim() || null,
+        stage: editStage || null,
         links,
         industries: editIndustries,
         tags: editTags,
@@ -342,7 +350,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       <header style={{ marginBottom: spacing[6] }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: spacing[3] }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: spacing[2] }}>
+            <div style={{ display: "flex", alignItems: "center", gap: spacing[2], flexWrap: "wrap" }}>
               <FolderGit2 size={20} color={colors.violet} />
               <h1
                 style={{
@@ -357,6 +365,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
               >
                 {project.name}
               </h1>
+              <ProjectStageBadge stage={project.stage} />
             </div>
             {project.tagline && (
               <p style={{ margin: `${spacing[2]}px 0 0`, fontFamily: fonts.body, fontSize: fontSize.body, color: colors.muted }}>
@@ -436,6 +445,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           <div style={{ marginTop: spacing[4], border: `1px solid ${colors.line}`, borderRadius: radii.lg, padding: spacing[4], display: "flex", flexDirection: "column", gap: spacing[3] }}>
             <Input label="Project name" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Project name" required />
             <Input label="Tagline (optional)" value={editTagline} onChange={(e) => setEditTagline(e.target.value)} placeholder="One line on what it is" />
+            <StageSelect value={editStage} onChange={setEditStage} />
             <LinksEditor links={editLinks} onChange={setEditLinks} />
             <ProjectLabelPicker industries={editIndustries} tags={editTags} onToggle={toggleEditLabel} />
             {saveError && (

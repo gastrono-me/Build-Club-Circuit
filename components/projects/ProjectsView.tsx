@@ -11,6 +11,8 @@ import { Card } from "@/components/ui/Card"
 import { Avatar } from "@/components/shell/Avatar"
 import { ProjectLabelPicker, ProjectLabelChips } from "@/components/projects/ProjectLabels"
 import { LinksEditor } from "@/components/projects/LinksEditor"
+import { ProjectStageBadge } from "@/components/projects/ProjectStageBadge"
+import { StageSelect } from "@/components/projects/StageSelect"
 import { SkeletonFeed } from "@/components/ui/Skeleton"
 import { normalizeLink } from "@/lib/storage/shipMedia"
 import { shipDate, shipTime } from "@/lib/time"
@@ -22,6 +24,7 @@ export function ProjectsView() {
   const [formOpen, setFormOpen] = useState(false)
   const [name, setName] = useState("")
   const [tagline, setTagline] = useState("")
+  const [stage, setStage] = useState("")
   const [links, setLinks] = useState<string[]>([])
   const [industries, setIndustries] = useState<string[]>([])
   const [tags, setTags] = useState<string[]>([])
@@ -38,6 +41,7 @@ export function ProjectsView() {
   function resetForm() {
     setName("")
     setTagline("")
+    setStage("")
     setLinks([])
     setIndustries([])
     setTags([])
@@ -60,7 +64,7 @@ export function ProjectsView() {
     setBusy(true)
     setError(null)
     try {
-      await create(name, tagline, { industries, tags }, cleanLinks(links))
+      await create(name, tagline, { industries, tags }, cleanLinks(links), stage || null)
       resetForm()
       setFormOpen(false)
     } catch (err: any) {
@@ -85,6 +89,7 @@ export function ProjectsView() {
             <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
               <Input label="Project name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Circuit mobile app" autoFocus required />
               <Input label="Tagline (optional)" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="One line on what it is" />
+              <StageSelect value={stage} onChange={setStage} />
               <LinksEditor links={links} onChange={setLinks} />
               <ProjectLabelPicker industries={industries} tags={tags} onToggle={toggleLabel} />
               {error && (
@@ -155,9 +160,11 @@ function ProjectCard({ project, now }: { project: ProjectRow; now: Date }) {
     <Link href={`/projects/${project.id}`} style={{ textDecoration: "none" }}>
       <Card spine="violet" padding={spacing[4]} style={{ height: "100%", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginBottom: spacing[2] }}>
-          <FolderGit2 size={16} color={colors.violet} />
+          <FolderGit2 size={16} color={colors.violet} style={{ flexShrink: 0 }} />
           <span
             style={{
+              flex: 1,
+              minWidth: 0,
               fontFamily: fonts.display,
               fontWeight: fontWeight.semibold,
               fontSize: fontSize.heading,
@@ -169,6 +176,7 @@ function ProjectCard({ project, now }: { project: ProjectRow; now: Date }) {
           >
             {project.name}
           </span>
+          <ProjectStageBadge stage={project.stage} />
         </div>
         {project.tagline && (
           <p style={{ margin: `0 0 ${spacing[3]}px`, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted, lineHeight: 1.45 }}>

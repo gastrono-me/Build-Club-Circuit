@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useState } from "react"
-import { CalendarRange, Pencil, Trash2, Plus } from "lucide-react"
+import Link from "next/link"
+import { CalendarRange, Pencil, Trash2, Plus, MonitorPlay } from "lucide-react"
 import { useEvents, type EventRow } from "@/lib/hooks/useEvents"
 import { eventStatus } from "@/lib/events/eventStatus"
 import { SectionTitle } from "@/components/ui/SectionTitle"
@@ -105,6 +106,18 @@ export function AdminView() {
   return (
     <div>
       <SectionTitle kicker="Admin" title="Events" note="Create and manage the events that show on the Events tab. Only staff can see this." />
+
+      <Link
+        href="/admin/screen"
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 7,
+          border: `1.4px solid ${colors.line}`, borderRadius: radii.md,
+          padding: "8px 13px", margin: `${spacing[4]}px 0 0`, textDecoration: "none",
+          fontFamily: fonts.mono, fontSize: fontSize.label, color: colors.violet, background: colors.panel,
+        }}
+      >
+        <MonitorPlay size={15} /> Open projector view — a rotating ship carousel for a screen
+      </Link>
 
       {editingId === null && (
         <div style={{ margin: `${spacing[4]}px 0 ${spacing[6]}px` }}>
