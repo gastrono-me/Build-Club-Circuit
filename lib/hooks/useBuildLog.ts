@@ -291,6 +291,41 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
     scheduleRefetch()
   }, [eventId, scheduleRefetch])
 
+  // Edit your own ship. Author-only at the DB layer (build_log_update_own);
+  // callers only expose the control on the viewer's own posts. Undefined fields
+  // are left untouched; pass null to clear a nullable column (e.g. project).
+  const update = useCallback(async (
+    id: string,
+    patch: { category?: string; note?: string; kind?: string; projectId?: string | null },
+  ) => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("Not authenticated")
+
+    const row: Record<string, unknown> = {}
+    if (patch.category !== undefined) row.category = patch.category
+    if (patch.note !== undefined) row.note = patch.note
+    if (patch.kind !== undefined) row.kind = patch.kind
+    if (patch.projectId !== undefined) row.project_id = patch.projectId
+    if (Object.keys(row).length === 0) return
+
+    const { error } = await supabase.from("build_log").update(row).eq("id", id)
+    if (error) throw error
+    notifyFeed(BUILD_LOG_TOPIC)
+    scheduleRefetch()
+  }, [scheduleRefetch])
+
+  // Delete your own ship (author-only at the DB layer). Cheers/comments cascade.
+  const remove = useCallback(async (id: string) => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("Not authenticated")
+    const { error } = await supabase.from("build_log").delete().eq("id", id)
+    if (error) throw error
+    notifyFeed(BUILD_LOG_TOPIC)
+    scheduleRefetch()
+  }, [scheduleRefetch])
+
   const toggleCheer = useCallback(async (postId: string) => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -321,6 +356,8 @@ export function useBuildLog(eventId?: string | null, filter?: BuildLogFilter) {
     myPostDates,
     loading,
     post,
+    update,
+    remove,
     toggleCheer,
     cheerCounts,
     commentCounts,

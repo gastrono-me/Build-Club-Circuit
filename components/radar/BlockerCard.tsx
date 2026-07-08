@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
 import { Tag } from "@/components/ui/Tag"
 import { Avatar } from "@/components/shell/Avatar"
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, Check, RotateCcw, Trash2 } from "lucide-react"
 import { useSocial, type ChatPerson } from "@/components/shell/SocialProvider"
 import { PersonButton } from "@/components/shell/PersonButton"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
@@ -24,6 +24,10 @@ interface BlockerCardProps {
   isOwn: boolean         // current user is the author
   currentUserId: string | null
   onMeToo: () => Promise<void>
+  /** Author-only: mark resolved / reopen. */
+  onResolve?: (resolved: boolean) => Promise<void>
+  /** Author-only: delete the blocker. */
+  onDelete?: () => Promise<void>
 }
 
 function timeAgo(iso: string): string {
@@ -43,8 +47,12 @@ export function BlockerCard({
   isOwn,
   currentUserId,
   onMeToo,
+  onResolve,
+  onDelete,
 }: BlockerCardProps) {
   const [voting, setVoting] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
+  const [confirmDelete, setConfirmDelete] = React.useState(false)
   const { openPanel } = useSocial()
 
   const authorName = blocker.author_id == null
@@ -52,6 +60,7 @@ export function BlockerCard({
     : (blocker.author_name ?? "Builder")
 
   const isAnonymous = blocker.author_id == null
+  const isResolved = !!blocker.resolved_at
 
   async function handleMeToo() {
     if (!currentUserId) return
@@ -63,9 +72,19 @@ export function BlockerCard({
     }
   }
 
+  async function run(fn: () => Promise<void>) {
+    setBusy(true)
+    try {
+      await fn()
+    } catch (err) {
+      console.error("[blocker] action failed:", err)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
-    <Card spine="live" padding={spacing[4]}>
+    <Card spine={isResolved ? "go" : "live"} padding={spacing[4]} style={isResolved ? { opacity: 0.72 } : undefined}>
       {/* Header row — clickable to the author's profile, unless anonymous */}
       <div style={{ display: "flex", alignItems: "center", gap: spacing[2], marginBottom: spacing[3] }}>
         <MaybePerson
@@ -119,7 +138,28 @@ export function BlockerCard({
         </div>
         </MaybePerson>
 
-        {/* Category tag */}
+        {/* Resolved badge + category tag */}
+        {isResolved && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "2px 8px",
+              borderRadius: radii.pill,
+              background: colors.goSoft,
+              color: colors.go,
+              fontFamily: fonts.mono,
+              fontSize: fontSize.micro,
+              fontWeight: fontWeight.semibold,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Check size={11} /> Resolved
+          </span>
+        )}
         <Tag tone="live">{blocker.category}</Tag>
       </div>
 
@@ -191,9 +231,73 @@ export function BlockerCard({
             <MessageCircle size={13} /> Message
           </button>
         )}
+
+        {/* Author controls: resolve / reopen + delete */}
+        {isOwn && onResolve && (
+          <button
+            type="button"
+            onClick={() => run(() => onResolve(!isResolved))}
+            disabled={busy}
+            title={isResolved ? "Move back to still stuck" : "Mark this blocker solved"}
+            style={ownerBtnStyle(isResolved ? colors.line : colors.go, isResolved ? colors.muted : colors.go, busy)}
+          >
+            {isResolved ? <><RotateCcw size={13} /> Reopen</> : <><Check size={13} /> Resolve</>}
+          </button>
+        )}
+
+        {isOwn && onDelete && (
+          confirmDelete ? (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => run(onDelete)}
+                disabled={busy}
+                style={ownerBtnStyle(colors.live, colors.live, busy)}
+              >
+                <Trash2 size={13} /> {busy ? "Deleting…" : "Confirm delete"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                disabled={busy}
+                style={{ border: "none", background: "transparent", color: colors.muted, fontFamily: fonts.mono, fontSize: fontSize.label, cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              title="Delete this blocker"
+              aria-label="Delete blocker"
+              style={{ display: "inline-flex", alignItems: "center", border: `1.4px solid ${colors.line}`, background: colors.surface, color: colors.muted, borderRadius: radii.md, padding: "6px 9px", cursor: "pointer" }}
+            >
+              <Trash2 size={13} />
+            </button>
+          )
+        )}
       </div>
     </Card>
   )
+}
+
+/** Shared style for the small author-only action buttons. */
+function ownerBtnStyle(border: string, fg: string, busy: boolean): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 5,
+    border: `1.4px solid ${border}`,
+    background: colors.surface,
+    color: fg,
+    borderRadius: radii.md,
+    padding: "6px 10px",
+    fontFamily: fonts.mono,
+    fontSize: fontSize.label,
+    cursor: busy ? "wait" : "pointer",
+    opacity: busy ? 0.6 : 1,
+  }
 }
 
 export default BlockerCard

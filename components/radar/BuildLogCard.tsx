@@ -5,16 +5,25 @@ import Link from "next/link"
 import { Card } from "@/components/ui/Card"
 import { Tag } from "@/components/ui/Tag"
 import { Avatar } from "@/components/shell/Avatar"
-import { FolderGit2, MessageCircle, Star } from "lucide-react"
+import { FolderGit2, MessageCircle, Star, Pencil, Trash2 } from "lucide-react"
 import { useSocial } from "@/components/shell/SocialProvider"
 import { PersonButton } from "@/components/shell/PersonButton"
 import { ShipAttachments } from "@/components/radar/ShipAttachments"
 import { ShipComments } from "@/components/radar/ShipComments"
 import { ShipKindBadge } from "@/components/radar/ShipKindBadge"
+import { WORK_CATEGORIES } from "@/lib/data/work-categories"
+import { SHIP_KINDS } from "@/lib/data/ship-kinds"
 import { useNow } from "@/lib/hooks/useNow"
 import { shipTime } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, motion } from "@/lib/design/tokens"
 import type { BuildLogRow } from "@/lib/hooks/useBuildLog"
+
+/** The subset of a ship a builder can edit in place. */
+export interface ShipEdit {
+  category: string
+  note: string
+  kind: string
+}
 
 interface BuildLogCardProps {
   post: BuildLogRow
@@ -31,6 +40,10 @@ interface BuildLogCardProps {
   highlight?: boolean
   /** Start with the comment thread expanded (comment notifications). */
   defaultOpenComments?: boolean
+  /** Author-only: save edits to the ship's category/note/type. */
+  onEdit?: (patch: ShipEdit) => Promise<void>
+  /** Author-only: delete the ship. */
+  onDelete?: () => Promise<void>
 }
 
 /** Full local timestamp for the title tooltip, e.g. "Jul 2, 2026, 2:05 PM". */
@@ -52,9 +65,44 @@ export function BuildLogCard({
   onToggleNominate,
   highlight = false,
   defaultOpenComments = false,
+  onEdit,
+  onDelete,
 }: BuildLogCardProps) {
   const [voting, setVoting] = React.useState(false)
+  const [editing, setEditing] = React.useState(false)
+  const [confirmDelete, setConfirmDelete] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
+  const [draft, setDraft] = React.useState<ShipEdit>({ category: post.category, note: post.note, kind: post.kind })
   const { openPanel } = useSocial()
+
+  function startEdit() {
+    setDraft({ category: post.category, note: post.note, kind: post.kind })
+    setEditing(true)
+  }
+
+  async function saveEdit() {
+    if (!onEdit || !draft.note.trim()) return
+    setBusy(true)
+    try {
+      await onEdit({ category: draft.category, note: draft.note.trim(), kind: draft.kind })
+      setEditing(false)
+    } catch (err) {
+      console.error("[ship] edit failed:", err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!onDelete) return
+    setBusy(true)
+    try {
+      await onDelete()
+    } catch (err) {
+      console.error("[ship] delete failed:", err)
+      setBusy(false)
+    }
+  }
   // Ticks every minute so "2m ago" doesn't freeze. Cards render client-fetched
   // data only, so the pre-mount fallback never reaches the screen.
   const now = useNow() ?? new Date()
@@ -152,23 +200,85 @@ export function BuildLogCard({
         </Link>
       )}
 
-      {/* Note body */}
-      <p
-        style={{
-          margin: `0 0 ${spacing[3]}px`,
-          fontFamily: fonts.body,
-          fontSize: fontSize.body,
-          color: colors.ink,
-          lineHeight: 1.55,
-        }}
-      >
-        {post.note}
-      </p>
+      {/* Note body — or the inline editor when the owner is editing */}
+      {editing ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: spacing[2], marginBottom: spacing[3] }}>
+          <textarea
+            value={draft.note}
+            onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))}
+            rows={3}
+            aria-label="Edit ship note"
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              border: `1.4px solid ${colors.line}`,
+              borderRadius: radii.md,
+              padding: "10px 12px",
+              fontFamily: fonts.body,
+              fontSize: fontSize.body,
+              color: colors.ink,
+              background: colors.surface,
+              outline: "none",
+              resize: "vertical",
+              lineHeight: 1.55,
+            }}
+          />
+          <div style={{ display: "flex", gap: spacing[2], flexWrap: "wrap" }}>
+            <select
+              value={draft.category}
+              onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
+              aria-label="Category"
+              style={editSelectStyle}
+            >
+              {WORK_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select
+              value={draft.kind}
+              onChange={(e) => setDraft((d) => ({ ...d, kind: e.target.value }))}
+              aria-label="Type"
+              style={editSelectStyle}
+            >
+              {SHIP_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </div>
+          <div style={{ display: "flex", gap: spacing[2] }}>
+            <button
+              type="button"
+              onClick={saveEdit}
+              disabled={busy || !draft.note.trim()}
+              style={{ ...ownerBtnStyle(colors.go, colors.go, busy), opacity: (busy || !draft.note.trim()) ? 0.55 : 1 }}
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={busy}
+              style={{ border: "none", background: "transparent", color: colors.muted, fontFamily: fonts.mono, fontSize: fontSize.label, cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p
+          style={{
+            margin: `0 0 ${spacing[3]}px`,
+            fontFamily: fonts.body,
+            fontSize: fontSize.body,
+            color: colors.ink,
+            lineHeight: 1.55,
+          }}
+        >
+          {post.note}
+        </p>
+      )}
 
       {/* Attachments (image / file / link) */}
-      <ShipAttachments post={post} />
+      {!editing && <ShipAttachments post={post} />}
 
       {/* Action row (wraps so an expanded comment thread takes the full width) */}
+      {!editing && (
       <div style={{ display: "flex", alignItems: "center", gap: spacing[2], flexWrap: "wrap" }}>
         {/* Cheer button — disabled for own posts */}
         <button
@@ -247,11 +357,88 @@ export function BuildLogCard({
           </button>
         )}
 
+        {/* Author controls: edit + delete */}
+        {isOwn && onEdit && (
+          <button
+            type="button"
+            onClick={startEdit}
+            title="Edit this ship"
+            aria-label="Edit ship"
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, border: `1.4px solid ${colors.line}`, background: colors.surface, color: colors.muted, borderRadius: radii.md, padding: "6px 10px", fontFamily: fonts.mono, fontSize: fontSize.label, cursor: "pointer" }}
+          >
+            <Pencil size={13} /> Edit
+          </button>
+        )}
+
+        {isOwn && onDelete && (
+          confirmDelete ? (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={busy}
+                style={ownerBtnStyle(colors.live, colors.live, busy)}
+              >
+                <Trash2 size={13} /> {busy ? "Deleting…" : "Confirm delete"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                disabled={busy}
+                style={{ border: "none", background: "transparent", color: colors.muted, fontFamily: fonts.mono, fontSize: fontSize.label, cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              title="Delete this ship"
+              aria-label="Delete ship"
+              style={{ display: "inline-flex", alignItems: "center", border: `1.4px solid ${colors.line}`, background: colors.surface, color: colors.muted, borderRadius: radii.md, padding: "6px 9px", cursor: "pointer" }}
+            >
+              <Trash2 size={13} />
+            </button>
+          )
+        )}
+
         {/* Last in the row: its expanded thread wraps to the full width below */}
         <ShipComments postId={post.id} count={commentCount} currentUserId={currentUserId} defaultOpen={defaultOpenComments} />
       </div>
+      )}
     </Card>
   )
+}
+
+/** Shared style for the small author-only action buttons. */
+function ownerBtnStyle(border: string, fg: string, busy: boolean): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 5,
+    border: `1.4px solid ${border}`,
+    background: colors.surface,
+    color: fg,
+    borderRadius: radii.md,
+    padding: "6px 10px",
+    fontFamily: fonts.mono,
+    fontSize: fontSize.label,
+    cursor: busy ? "wait" : "pointer",
+    opacity: busy ? 0.6 : 1,
+  }
+}
+
+const editSelectStyle: React.CSSProperties = {
+  padding: "8px 10px",
+  fontFamily: fonts.body,
+  fontSize: fontSize.meta,
+  color: colors.ink,
+  background: colors.surface,
+  border: `1.4px solid ${colors.line}`,
+  borderRadius: radii.md,
+  outline: "none",
+  cursor: "pointer",
 }
 
 export default BuildLogCard

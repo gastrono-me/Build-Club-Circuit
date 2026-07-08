@@ -15,7 +15,15 @@ type FeedTab = "shipped" | "stuck"
 export function RadarFeed({ eventId, compose = true }: { eventId?: string | null; compose?: boolean } = {}) {
   // Shipped leads: Explore is a ships-first archive; Stuck is the help lens.
   const [tab, setTab] = React.useState<FeedTab>("shipped")
-  const { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore } = useRadar(eventId)
+  const { blockers, loading, post, toggleMeToo, resolve, remove, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore } = useRadar(eventId)
+
+  // The field is the live "who's stuck" lens, so it plots only unresolved
+  // blockers. The list shows everything but sinks resolved ones to the bottom.
+  const activeBlockers = React.useMemo(() => blockers.filter((b) => !b.resolved_at), [blockers])
+  const sortedBlockers = React.useMemo(
+    () => [...blockers].sort((a, b) => Number(!!a.resolved_at) - Number(!!b.resolved_at)),
+    [blockers],
+  )
   // Your just-posted blocker (id-stable, set from post()'s returned id).
   const [latestId, setLatestId] = React.useState<string | null>(null)
   // A node that just took a cross-client "me too" (transient pulse).
@@ -165,7 +173,7 @@ export function RadarFeed({ eventId, compose = true }: { eventId?: string | null
       {/* Hero: Embedding Plot */}
       <CollapsibleField>
         <EmbeddingPlot
-          blockers={blockers}
+          blockers={activeBlockers}
           meTooCounts={meTooCounts}
           mineMeToo={mineMeToo}
           userId={userId}
@@ -223,17 +231,22 @@ export function RadarFeed({ eventId, compose = true }: { eventId?: string | null
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
-            {blockers.map((blocker) => (
-              <BlockerCard
-                key={blocker.id}
-                blocker={blocker}
-                metooCount={meTooCounts[blocker.id] ?? 0}
-                isMine={mineMeToo.has(blocker.id)}
-                isOwn={!!userId && blocker.author_id === userId}
-                currentUserId={userId}
-                onMeToo={() => toggleMeToo(blocker.id)}
-              />
-            ))}
+            {sortedBlockers.map((blocker) => {
+              const isOwn = !!userId && blocker.author_id === userId
+              return (
+                <BlockerCard
+                  key={blocker.id}
+                  blocker={blocker}
+                  metooCount={meTooCounts[blocker.id] ?? 0}
+                  isMine={mineMeToo.has(blocker.id)}
+                  isOwn={isOwn}
+                  currentUserId={userId}
+                  onMeToo={() => toggleMeToo(blocker.id)}
+                  onResolve={isOwn ? (resolved) => resolve(blocker.id, resolved) : undefined}
+                  onDelete={isOwn ? () => remove(blocker.id) : undefined}
+                />
+              )
+            })}
           </div>
         )}
 

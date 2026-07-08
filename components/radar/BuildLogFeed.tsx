@@ -39,7 +39,7 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
     return () => clearTimeout(t)
   }, [authorInput])
 
-  const { posts, loading, post, toggleCheer, cheerCounts, commentCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId, { category, kind, author })
+  const { posts, loading, post, update, remove, toggleCheer, cheerCounts, commentCounts, mineCheers, userId, loadMore, hasMore } = useBuildLog(eventId, { category, kind, author })
   const { mine: nominated, nominate, unnominate } = useSpotlightNominations()
 
   const filtering = !!category || !!kind || !!author
@@ -306,6 +306,8 @@ export function BuildLogFeed({ eventId, compose = true }: { eventId?: string | n
                     isNominated={nominated.has(p.id)}
                     highlight={isTarget}
                     defaultOpenComments={isTarget && openComments}
+                    onEdit={isOwn ? (patch) => update(p.id, patch) : undefined}
+                    onDelete={isOwn ? () => remove(p.id) : undefined}
                     onToggleNominate={
                       isOwn
                         ? () =>

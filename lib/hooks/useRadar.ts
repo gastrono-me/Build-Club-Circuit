@@ -12,6 +12,8 @@ export interface BlockerRow {
   note: string
   created_at: string
   event_id?: string | null
+  /** null = still stuck; a timestamp = the author marked it resolved. */
+  resolved_at?: string | null
   /** Joined from profiles — may be null for seed/community posts */
   author_name?: string | null
   author_avatar?: string | null
@@ -64,6 +66,7 @@ export function useRadar(eventId?: string | null) {
         note,
         created_at,
         event_id,
+        resolved_at,
         profiles:author_id ( name, avatar_url )
       `)
       .order("created_at", { ascending: false })
@@ -82,6 +85,7 @@ export function useRadar(eventId?: string | null) {
       note: b.note,
       created_at: b.created_at,
       event_id: b.event_id ?? null,
+      resolved_at: b.resolved_at ?? null,
       author_name: b.profiles?.name ?? null,
       author_avatar: b.profiles?.avatar_url ?? null,
     }))
@@ -183,6 +187,32 @@ export function useRadar(eventId?: string | null) {
     return (data?.id ?? null) as string | null
   }, [eventId, scheduleRefetch])
 
+  // Mark a blocker resolved (or reopen it). Author-only at the DB layer
+  // (blockers_update_own); the card only shows the control on your own posts.
+  const resolve = useCallback(async (blockerId: string, resolved: boolean) => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("Not authenticated")
+    const { error } = await supabase
+      .from("blockers")
+      .update({ resolved_at: resolved ? new Date().toISOString() : null })
+      .eq("id", blockerId)
+    if (error) throw error
+    notifyFeed(BLOCKERS_TOPIC)
+    scheduleRefetch()
+  }, [scheduleRefetch])
+
+  // Delete a blocker outright (author-only at the DB layer).
+  const remove = useCallback(async (blockerId: string) => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("Not authenticated")
+    const { error } = await supabase.from("blockers").delete().eq("id", blockerId)
+    if (error) throw error
+    notifyFeed(BLOCKERS_TOPIC)
+    scheduleRefetch()
+  }, [scheduleRefetch])
+
   const toggleMeToo = useCallback(async (blockerId: string) => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -207,5 +237,5 @@ export function useRadar(eventId?: string | null) {
     scheduleRefetch()
   }, [mineMeToo, scheduleRefetch])
 
-  return { blockers, loading, post, toggleMeToo, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore }
+  return { blockers, loading, post, toggleMeToo, resolve, remove, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore }
 }

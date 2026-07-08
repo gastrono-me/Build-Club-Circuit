@@ -62,11 +62,12 @@ create trigger on_auth_user_created
 -- ─────────────────────────────────────────────────────────
 -- 002 radar: shared blocker feed + "me too", RLS, Realtime (the hero)
 create table if not exists public.blockers (
-  id         uuid primary key default gen_random_uuid(),
-  author_id  uuid references public.profiles(id) on delete cascade,  -- nullable: seed/community posts
-  category   text not null,
-  note       text not null,
-  created_at timestamptz not null default now()
+  id          uuid primary key default gen_random_uuid(),
+  author_id   uuid references public.profiles(id) on delete cascade,  -- nullable: seed/community posts
+  category    text not null,
+  note        text not null,
+  created_at  timestamptz not null default now(),
+  resolved_at timestamptz  -- null = still stuck; a timestamp = resolved (028)
 );
 
 create table if not exists public.blocker_metoo (
@@ -86,6 +87,8 @@ drop policy if exists blockers_insert_own on public.blockers;
 create policy blockers_insert_own on public.blockers for insert to authenticated with check (auth.uid() = author_id);
 drop policy if exists blockers_delete_own on public.blockers;
 create policy blockers_delete_own on public.blockers for delete to authenticated using (auth.uid() = author_id);
+drop policy if exists blockers_update_own on public.blockers;
+create policy blockers_update_own on public.blockers for update to authenticated using (auth.uid() = author_id) with check (auth.uid() = author_id);
 
 drop policy if exists metoo_select on public.blocker_metoo;
 create policy metoo_select on public.blocker_metoo for select to authenticated using (true);
