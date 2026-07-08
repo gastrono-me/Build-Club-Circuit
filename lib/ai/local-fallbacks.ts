@@ -150,15 +150,6 @@ export function localAnswer(me: PersonLike, ctx: LocalAnswerCtx, q: string): str
     : `Your day looks full or winding down. Use any gap to build, or check Community Night to meet people.`
 }
 
-// ---- localPitchFeedback -------------------------------------------------
-
-/** Heuristic 3-minute pitch feedback. Ported from main App.jsx:208-212. */
-export function localPitchFeedback(text: string): string {
-  const words = text.trim().split(/\s+/).filter(Boolean).length
-  const minutes = (words / 130).toFixed(1)
-  return `Roughly ${words} words. At a natural speaking pace that is about ${minutes} minutes aloud (target is 3).\n\nMake sure you hit, in order: the problem in one sentence, who actually has it, what you built, and a moment that shows it working live.\n\nLikely judge questions: "What happens when the AI call fails?" and "Why does this need AI at all, versus a simple form or lookup?"`
-}
-
 // ---- localReason --------------------------------------------------------
 
 /** One-line "why meet them". Ported from main App.jsx:165-177. */

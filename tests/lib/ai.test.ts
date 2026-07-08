@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { localReadinessReview, localAnswer, localPitchFeedback, localReason } from '@/lib/ai/local-fallbacks'
+import { localReadinessReview, localAnswer, localReason } from '@/lib/ai/local-fallbacks'
 
 describe('localReadinessReview', () => {
   it('flags missing demo link when absent', () => {
@@ -76,20 +76,6 @@ describe('localAnswer', () => {
     const result = localAnswer(me, ctxWithSession, 'what is happening now')
     expect(result).toContain('GEM Center')
     expect(result).not.toContain(' at gem')
-  })
-})
-
-describe('localPitchFeedback', () => {
-  it('reports an approximate spoken duration from word count', () => {
-    const text = Array.from({ length: 130 }, () => 'word').join(' ')
-    const out = localPitchFeedback(text)
-    expect(out).toContain('130 words')
-    expect(out).toContain('1.0 minutes')
-  })
-  it('always includes the structure reminder and judge questions', () => {
-    const out = localPitchFeedback('short pitch')
-    expect(out).toContain('the problem in one sentence')
-    expect(out).toContain('Likely judge questions')
   })
 })
 

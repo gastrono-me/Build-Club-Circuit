@@ -3,7 +3,6 @@ import {
   Users,
   CalendarRange,
   Compass,
-  Mic,
   FolderGit2,
   Shield,
   type LucideIcon,
@@ -33,7 +32,7 @@ export function isActivePath(pathname: string, href: string): boolean {
 
 /**
  * Circuit's navigation, grouped by the evergreen model:
- *  - "Your build" — the daily loop (the spine): ship today, projects, pitch.
+ *  - "Your build" — the daily loop (the spine): ship today, projects.
  *  - "Community"  — the always-on graph: browse everyone's ships + blockers,
  *    people, and events.
  *
@@ -47,7 +46,6 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Today", href: "/home", Icon: Home },
       { label: "Projects", href: "/projects", Icon: FolderGit2 },
-      { label: "Pitch Coach", href: "/pitch", Icon: Mic },
     ],
   },
   {
