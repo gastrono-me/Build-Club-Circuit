@@ -13,7 +13,7 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing, letterSpacing } fr
 
 type FeedTab = "shipped" | "stuck"
 
-export function RadarFeed({ eventId, compose = true }: { eventId?: string | null; compose?: boolean } = {}) {
+export function RadarFeed({ eventId, compose = true, hero = true }: { eventId?: string | null; compose?: boolean; hero?: boolean } = {}) {
   // Shipped leads: Explore is a ships-first archive; Stuck is the help lens.
   const [tab, setTab] = React.useState<FeedTab>("shipped")
   const { blockers, loading, post, toggleMeToo, resolve, remove, meTooCounts, mineMeToo, userId, bump, loadMore, hasMore } = useRadar(eventId)
@@ -115,7 +115,9 @@ export function RadarFeed({ eventId, compose = true }: { eventId?: string | null
 
       {tab === "stuck" && (
         <>
-      {/* Heading */}
+      {/* Standalone hero — suppressed when embedded (e.g. the event page,
+          which supplies its own header and phase badge). */}
+      {hero && (
       <header>
         <h1
           style={{
@@ -171,6 +173,7 @@ export function RadarFeed({ eventId, compose = true }: { eventId?: string | null
           LIVE
         </div>
       </header>
+      )}
 
       {/* Hero: Embedding Plot */}
       <CollapsibleField>
