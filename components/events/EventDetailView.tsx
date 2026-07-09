@@ -211,7 +211,7 @@ export function EventDetailView({ slug }: { slug: string }) {
         />
       )}
 
-      <RadarFeed eventId={scope === "event" ? event.id : null} />
+      <RadarFeed eventId={scope === "event" ? event.id : null} hero={false} />
     </div>
   )
 }
