@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react"
 import Link from "next/link"
-import { Flame, Check, LifeBuoy, ArrowRight, CalendarClock } from "lucide-react"
+import { Flame, Check, LifeBuoy, ArrowRight } from "lucide-react"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { useProfile } from "@/lib/hooks/useProfile"
 import { useNow } from "@/lib/hooks/useNow"
@@ -16,6 +16,7 @@ import { UpcomingEventsStrip } from "@/components/events/UpcomingEventsStrip"
 import { ProfileNudge } from "@/components/onboarding/ProfileNudge"
 import { useActiveEvent } from "@/lib/hooks/useActiveEvent"
 import { useSocial } from "@/components/shell/SocialProvider"
+import { LivePulseCard } from "@/components/coworking/LivePulseCard"
 import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/lib/design/tokens"
 
 /**
@@ -130,28 +131,7 @@ export function TodayView() {
             : "Log one thing you got working today to keep your streak alive."}
         </p>
 
-        {activeEvent && (
-          <Link
-            href={`/events/${activeEvent.slug}`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: spacing[2],
-              marginBottom: spacing[3],
-              padding: `${spacing[2]}px ${spacing[3]}px`,
-              borderRadius: radii.md,
-              background: colors.goSoft,
-              border: `1.4px solid ${colors.go}`,
-              textDecoration: "none",
-              fontFamily: fonts.body,
-              fontSize: fontSize.meta,
-              color: colors.ink,
-            }}
-          >
-            <CalendarClock size={15} color={colors.go} style={{ flexShrink: 0 }} />
-            <span>You&rsquo;re in <strong style={{ fontWeight: fontWeight.semibold }}>{activeEvent.name}</strong> — ships count toward it while it&rsquo;s live.</span>
-          </Link>
-        )}
+        <LivePulseCard event={activeEvent} />
 
         <PostUpdate onPost={post} activeEvent={activeEvent ? { id: activeEvent.id, name: activeEvent.name } : null} />
 

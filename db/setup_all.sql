@@ -1,8 +1,9 @@
 -- ============================================================
 -- Circuit — full schema setup bundle (generated)
--- Paste into the Supabase SQL editor of the NEW project and run.
+-- Paste into the Supabase SQL editor of a NEW project and run.
 -- Idempotent: safe to re-run after adding migrations.
 -- Source of truth is db/migrations/*.sql + db/seed.sql.
+-- Regenerate with: npm run db:bundle
 -- ============================================================
 
 
@@ -62,12 +63,11 @@ create trigger on_auth_user_created
 -- ─────────────────────────────────────────────────────────
 -- 002 radar: shared blocker feed + "me too", RLS, Realtime (the hero)
 create table if not exists public.blockers (
-  id          uuid primary key default gen_random_uuid(),
-  author_id   uuid references public.profiles(id) on delete cascade,  -- nullable: seed/community posts
-  category    text not null,
-  note        text not null,
-  created_at  timestamptz not null default now(),
-  resolved_at timestamptz  -- null = still stuck; a timestamp = resolved (028)
+  id         uuid primary key default gen_random_uuid(),
+  author_id  uuid references public.profiles(id) on delete cascade,  -- nullable: seed/community posts
+  category   text not null,
+  note       text not null,
+  created_at timestamptz not null default now()
 );
 
 create table if not exists public.blocker_metoo (
@@ -87,8 +87,6 @@ drop policy if exists blockers_insert_own on public.blockers;
 create policy blockers_insert_own on public.blockers for insert to authenticated with check (auth.uid() = author_id);
 drop policy if exists blockers_delete_own on public.blockers;
 create policy blockers_delete_own on public.blockers for delete to authenticated using (auth.uid() = author_id);
-drop policy if exists blockers_update_own on public.blockers;
-create policy blockers_update_own on public.blockers for update to authenticated using (auth.uid() = author_id) with check (auth.uid() = author_id);
 
 drop policy if exists metoo_select on public.blocker_metoo;
 create policy metoo_select on public.blocker_metoo for select to authenticated using (true);
@@ -679,6 +677,12 @@ create policy ships_auth_update on storage.objects
 -- db/migrations/017_activity_reads.sql
 -- ─────────────────────────────────────────────────────────
 -- 017 activity notifications: a read cursor for "who reacted to my ships".
+--
+-- Cheers already live in build_log_cheers (008); this only adds the per-user
+-- "last time I looked at my activity" marker so the bell can show an unread
+-- count for cheers on your own posts, the same way message_reads (006) does
+-- for direct messages. One row per user, so a single cursor covers the stream.
+
 create table if not exists public.activity_reads (
   user_id      uuid primary key references public.profiles(id) on delete cascade,
   last_read_at timestamptz not null default now()
@@ -694,7 +698,10 @@ create policy activity_reads_all_own on public.activity_reads
 -- ─────────────────────────────────────────────────────────
 -- db/migrations/018_project_link.sql
 -- ─────────────────────────────────────────────────────────
--- 018 project link: a project's primary URL (website, repo, or demo).
+-- 018 project link: a project's primary URL (its website, repo, or demo), so a
+-- builder can point the cohort at the thing itself once it exists -- e.g. when
+-- they launch a site. Nullable, so existing projects stay valid.
+
 alter table public.projects
   add column if not exists link_url text;
 
@@ -702,7 +709,10 @@ alter table public.projects
 -- ─────────────────────────────────────────────────────────
 -- db/migrations/019_project_links_array.sql
 -- ─────────────────────────────────────────────────────────
--- 019 project links: several links per project (text[]), replacing link_url.
+-- 019 project links: a project can carry several links (website, repo, demo,
+-- socials), not just one. Replaces the single link_url (018) with a text[] of
+-- URLs, each rendered by its hostname. Any existing single link is preserved.
+
 alter table public.projects
   add column if not exists links text[] not null default '{}';
 
@@ -717,9 +727,23 @@ alter table public.projects
 -- ─────────────────────────────────────────────────────────
 -- db/migrations/020_storage_hardening.sql
 -- ─────────────────────────────────────────────────────────
--- 020 storage hardening: owner-scoped writes + size/type limits on both buckets.
+-- 020 storage hardening: lock the public buckets down to their owners and
+-- enforce size/type limits at the storage layer, not just in client JS.
+--
+-- Before this, any authenticated user could (a) upload into anyone's folder,
+-- (b) OVERWRITE anyone else's files via the broad update policies (e.g.
+-- replace another builder's avatar.jpg), (c) upload any mime type at any
+-- size (the 10 MB cap lived only in the browser). Both buckets already key
+-- paths by {userId}/..., so policies scope to the first path segment.
+-- Public read stays: build-in-public by design.
+
+-- ── Bucket-level constraints ─────────────────────────────────────────────
+-- Ships: images render inline; anything else is a download chip. HTML/SVG
+-- are deliberately absent (script-bearing types); unknown types upload as
+-- application/octet-stream (the client's fallback), which browsers download
+-- rather than render.
 update storage.buckets set
-  file_size_limit = 10485760,
+  file_size_limit = 10485760, -- 10 MB, matching the client cap
   allowed_mime_types = array[
     'image/png','image/jpeg','image/gif','image/webp','image/avif',
     'video/mp4','video/webm','video/quicktime',
@@ -730,11 +754,13 @@ update storage.buckets set
   ]
 where id = 'ships';
 
+-- Avatars: the profile form compresses to JPEG client-side; keep headroom.
 update storage.buckets set
-  file_size_limit = 5242880,
+  file_size_limit = 5242880, -- 5 MB
   allowed_mime_types = array['image/jpeg','image/png','image/webp']
 where id = 'avatars';
 
+-- ── Ships: owner-folder write policies ───────────────────────────────────
 drop policy if exists ships_auth_insert on storage.objects;
 create policy ships_auth_insert on storage.objects
   for insert to authenticated
@@ -752,6 +778,7 @@ create policy ships_owner_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'ships' and (storage.foldername(name))[1] = auth.uid()::text);
 
+-- ── Avatars: owner-folder write policies ─────────────────────────────────
 drop policy if exists avatars_auth_insert on storage.objects;
 create policy avatars_auth_insert on storage.objects
   for insert to authenticated
@@ -773,7 +800,11 @@ create policy avatars_owner_delete on storage.objects
 -- ─────────────────────────────────────────────────────────
 -- db/migrations/021_ship_comments.sql
 -- ─────────────────────────────────────────────────────────
--- 021 ship comments: flat comments per ship + aggregate count view.
+-- 021 ship comments: flat, one level, per ship. Cheers are applause; comments
+-- are conversation ("how did you build that?"). Same shape and policies as
+-- build_log_cheers (008), plus the aggregate-count view pattern from 012 so
+-- feeds read one bounded row per post instead of scanning the table.
+
 create table if not exists public.ship_comments (
   id         uuid primary key default gen_random_uuid(),
   post_id    uuid not null references public.build_log(id) on delete cascade,
@@ -799,6 +830,7 @@ drop policy if exists ship_comments_delete_own on public.ship_comments;
 create policy ship_comments_delete_own on public.ship_comments
   for delete to authenticated using (auth.uid() = author_id);
 
+-- One bounded row per post for feed badges.
 create or replace view public.ship_comment_counts
   with (security_invoker = on) as
   select post_id, count(*)::int as comments
@@ -809,54 +841,57 @@ grant select on public.ship_comment_counts to authenticated;
 
 
 -- ─────────────────────────────────────────────────────────
--- db/migrations/024_ship_kind.sql
+-- db/migrations/022_evergreen_data.sql
 -- ─────────────────────────────────────────────────────────
--- 024 ship type: Update / Feature / Milestone axis + per-project-kind counts.
-alter table public.build_log
-  add column if not exists kind text not null default 'Update';
+-- 022 evergreen data: the code moved to the shared work taxonomy (WORK_CATEGORIES)
+-- but the live rows didn't. Two fixes:
+--
+-- 1) Remap legacy AABW-era categories on blockers and ships to the new
+--    taxonomy, so every node on the embedding fields gets a real anchor and
+--    color instead of the hash/ink fallback.
+-- 2) Replace the seeded community blockers (author_id is null) with a
+--    discipline-spanning evergreen set - the old ones were all AI-hackathon
+--    problems (API credits, chunking, agent loops), which read wrong for a
+--    community that includes GTM, sales, and design builders.
 
-drop policy if exists build_log_update_own on public.build_log;
-create policy build_log_update_own on public.build_log
-  for update to authenticated
-  using (auth.uid() = author_id) with check (auth.uid() = author_id);
+-- ── 1) Category remap (both tables share the taxonomy) ────────────────────
+update public.blockers set category = 'Engineering'
+  where category in ('Auth/Login','Deploy/Infra','RAG/Retrieval','Agent loops','Rate limits/Cost','Data/Eval');
+update public.blockers set category = 'Design'  where category = 'UI polish';
+update public.blockers set category = 'Product' where category = 'Launch/Demo';
+update public.blockers set category = 'Other'   where category = 'Getting unstuck';
 
-create or replace view public.project_ship_kind_counts
-  with (security_invoker = on) as
-  select project_id, kind, count(*)::int as count
-  from public.build_log
-  where project_id is not null
-  group by project_id, kind;
+update public.build_log set category = 'Engineering'
+  where category in ('Auth/Login','Deploy/Infra','RAG/Retrieval','Agent loops','Rate limits/Cost','Data/Eval');
+update public.build_log set category = 'Design'  where category = 'UI polish';
+update public.build_log set category = 'Product' where category = 'Launch/Demo';
+update public.build_log set category = 'Other'   where category = 'Getting unstuck';
 
-grant select on public.project_ship_kind_counts to authenticated;
+-- ── 2) Reseed the community blockers ──────────────────────────────────────
+-- Null-author rows are seeds by definition (the UI labels them "Community").
+-- Their me-toos cascade away with them; they are demo content.
+delete from public.blockers where author_id is null;
 
--- 025 author ship tally: per-builder, per-kind counts for the profile popup.
-create or replace view public.author_ship_kind_counts
-  with (security_invoker = on) as
-  select author_id, kind, count(*)::int as count
-  from public.build_log
-  group by author_id, kind;
-
-grant select on public.author_ship_kind_counts to authenticated;
-
--- 026 project stage: single lifecycle value per project (Idea…Scaling).
-alter table public.projects
-  add column if not exists stage text;
-
--- 027 onboarding: first-run flag (existing profiles backfilled as onboarded).
-alter table public.profiles
-  add column if not exists onboarded_at timestamptz;
-
-update public.profiles
-  set onboarded_at = coalesce(created_at, now())
-  where onboarded_at is null;
+insert into public.blockers (author_id, category, note) values
+  (null, 'Engineering', 'OAuth redirect loops forever on mobile Safari. Third day on this.'),
+  (null, 'Product',     'People sign up, poke around once, and never come back. Cannot tell which feature is supposed to hook them.'),
+  (null, 'Growth',      'Landing page converts at under 1 percent. Not sure if it is the copy or the audience.'),
+  (null, 'Sales',       'Demos go great, then the deal goes quiet. Following up without being annoying is a skill I do not have yet.'),
+  (null, 'Fundraising', '3-minute pitch is still 6 minutes of jargon. Need to cut it down hard.');
 
 
 -- ─────────────────────────────────────────────────────────
 -- db/migrations/023_admins.sql
 -- ─────────────────────────────────────────────────────────
--- 023 admins: staff role (separate table, not a self-grantable profile flag);
--- events become admin-managed. Bootstrap the first admin from the SQL editor:
+-- 023 admins: a staff role, and events become admin-managed.
+--
+-- Deliberately a SEPARATE table, not a column on profiles: profiles_update_own
+-- (001) lets a user edit any column on their own row, so an is_admin flag there
+-- would be self-grantable. This table has a read policy but NO write policy, so
+-- normal users can never insert/update it - admin status is bootstrapped by
+-- inserting a row from the Supabase SQL editor (service role bypasses RLS):
 --   insert into public.admins (user_id) values ('<your-profile-uuid>');
+
 create table if not exists public.admins (
   user_id    uuid primary key references public.profiles(id) on delete cascade,
   created_at timestamptz not null default now()
@@ -864,16 +899,21 @@ create table if not exists public.admins (
 
 alter table public.admins enable row level security;
 
+-- You can see whether YOU are an admin; you cannot enumerate staff or write it.
 drop policy if exists admins_select_own on public.admins;
 create policy admins_select_own on public.admins
   for select to authenticated using (user_id = auth.uid());
 
+-- SECURITY DEFINER so RLS policies can call it without recursing into admins'
+-- own RLS. STABLE: one lookup per statement.
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.admins where user_id = auth.uid());
 $$;
 grant execute on function public.is_admin() to authenticated;
 
+-- Events: writes move from creator-scoped to admin-only. Reads + join/leave
+-- (event_members) are unchanged - any builder still browses and joins.
 drop policy if exists events_insert_own on public.events;
 drop policy if exists events_insert_admin on public.events;
 create policy events_insert_admin on public.events
@@ -889,34 +929,682 @@ drop policy if exists events_delete_admin on public.events;
 create policy events_delete_admin on public.events
   for delete to authenticated using (public.is_admin());
 
--- Admin moderation (030): staff can delete any ship or blocker. Additional
--- permissive delete policies alongside the *_delete_own ones (RLS OR-combines),
--- so a row is deletable by its author or an admin.
+
+-- ─────────────────────────────────────────────────────────
+-- db/migrations/024_ship_kind.sql
+-- ─────────────────────────────────────────────────────────
+-- 024 ship type: a second axis on ships, orthogonal to the work category.
+-- Category = which discipline (Product/Engineering/…); kind = how significant
+-- (Update / Feature / Milestone). Free text like category, default 'Update'
+-- (most ships are small updates). Adding the column backfills existing rows to
+-- 'Update'.
+
+alter table public.build_log
+  add column if not exists kind text not null default 'Update';
+
+-- Editing your own ship had no policy before (only insert/delete existed);
+-- add it so builders can reclassify a ship's type after posting.
+drop policy if exists build_log_update_own on public.build_log;
+create policy build_log_update_own on public.build_log
+  for update to authenticated
+  using (auth.uid() = author_id) with check (auth.uid() = author_id);
+
+-- Per-project, per-kind ship counts for the project tally. One bounded row per
+-- (project, kind), same aggregate-view pattern as 012/013.
+create or replace view public.project_ship_kind_counts
+  with (security_invoker = on) as
+  select project_id, kind, count(*)::int as count
+  from public.build_log
+  where project_id is not null
+  group by project_id, kind;
+
+grant select on public.project_ship_kind_counts to authenticated;
+
+
+-- ─────────────────────────────────────────────────────────
+-- db/migrations/025_author_ship_counts.sql
+-- ─────────────────────────────────────────────────────────
+-- 025 author ship tally: per-builder, per-kind ship counts for the profile
+-- popup ("Ada has shipped 12 updates, 3 features, 2 milestones"). Same
+-- aggregate-view pattern as project_ship_kind_counts (024), grouped by author
+-- instead of project. Counts every ship the builder has logged, project-tagged
+-- or not.
+
+create or replace view public.author_ship_kind_counts
+  with (security_invoker = on) as
+  select author_id, kind, count(*)::int as count
+  from public.build_log
+  group by author_id, kind;
+
+grant select on public.author_ship_kind_counts to authenticated;
+
+
+-- ─────────────────────────────────────────────────────────
+-- db/migrations/026_project_stage.sql
+-- ─────────────────────────────────────────────────────────
+-- 026 project stage: where a project is on its lifecycle arc (Idea -> Prototype
+-- -> MVP -> Launched -> Revenue -> Scaling). A single value per project (unlike
+-- the multi-value industries/tags labels), nullable — not every project sets
+-- one. Free text, so the set can change with no migration.
+
+alter table public.projects
+  add column if not exists stage text;
+
+
+-- ─────────────────────────────────────────────────────────
+-- db/migrations/027_onboarding.sql
+-- ─────────────────────────────────────────────────────────
+-- 027 onboarding: mark when a builder has been through the welcome setup, so
+-- new users get a guided first run and existing ones don't. Nullable timestamp;
+-- set when they finish (or skip) /welcome.
+--
+-- Backfill every existing profile as already-onboarded — they've been using the
+-- app, so they must not be bounced into onboarding. New signups (the
+-- handle_new_user trigger inserts only id + name) get null and are guided.
+
+alter table public.profiles
+  add column if not exists onboarded_at timestamptz;
+
+update public.profiles
+  set onboarded_at = coalesce(created_at, now())
+  where onboarded_at is null;
+
+
+-- ─────────────────────────────────────────────────────────
+-- db/migrations/028_blocker_resolve.sql
+-- ─────────────────────────────────────────────────────────
+-- 028 blocker resolve: close the "stuck" loop. A blocker could be posted and
+-- deleted, but not marked solved. resolved_at (null = still stuck, a timestamp =
+-- resolved) lets a builder retire a blocker as solved while keeping the record,
+-- so the arc from "stuck" to "unstuck" is visible instead of vanishing.
+
+alter table public.blockers
+  add column if not exists resolved_at timestamptz;
+
+-- Editing your own blocker had no policy before (only insert/delete existed);
+-- add it so the author can flip resolved_at (resolve / reopen).
+drop policy if exists blockers_update_own on public.blockers;
+create policy blockers_update_own on public.blockers
+  for update to authenticated
+  using (auth.uid() = author_id) with check (auth.uid() = author_id);
+
+
+-- ─────────────────────────────────────────────────────────
+-- db/migrations/029_drop_seed_blockers.sql
+-- ─────────────────────────────────────────────────────────
+-- 029 drop the seeded "community" blockers. Migration 022 reseeded a set of
+-- null-author demo blockers to keep the stuck feed from looking empty. The
+-- cohort is now real, so the placeholder posts are just fake data on a live
+-- surface. Remove them; their me-toos cascade away with them. Real blockers
+-- always carry an author_id (post() sets auth.uid()), so this only touches seeds.
+
+delete from public.blockers where author_id is null;
+
+
+-- ─────────────────────────────────────────────────────────
+-- db/migrations/030_admin_moderation.sql
+-- ─────────────────────────────────────────────────────────
+-- 030 admin moderation: let staff delete any ship or blocker, not just their
+-- own. These are additional PERMISSIVE delete policies alongside the existing
+-- *_delete_own ones, so RLS OR-combines them: a row is deletable if you are its
+-- author OR you are an admin. is_admin() (023) is SECURITY DEFINER, so it works
+-- inside these policies without recursing into admins' own RLS.
+
 drop policy if exists build_log_delete_admin on public.build_log;
 create policy build_log_delete_admin on public.build_log
   for delete to authenticated using (public.is_admin());
+
 drop policy if exists blockers_delete_admin on public.blockers;
 create policy blockers_delete_admin on public.blockers
   for delete to authenticated using (public.is_admin());
 
 
 -- ─────────────────────────────────────────────────────────
--- db/migrations/022_evergreen_data.sql (remap only)
+-- db/migrations/031_live_coworking.sql
 -- ─────────────────────────────────────────────────────────
--- 022: remap legacy AABW-era categories to the shared work taxonomy. No-op on
--- fresh installs; the reseed half of 022 is live-data-only (the seed block
--- below already inserts the evergreen set).
-update public.blockers set category = 'Engineering'
-  where category in ('Auth/Login','Deploy/Infra','RAG/Retrieval','Agent loops','Rate limits/Cost','Data/Eval');
-update public.blockers set category = 'Design'  where category = 'UI polish';
-update public.blockers set category = 'Product' where category = 'Launch/Demo';
-update public.blockers set category = 'Other'   where category = 'Getting unstuck';
+-- 031 live coworking: bring Pulse's in-room operating layer into Circuit.
+--
+-- Circuit remains the system of record for profiles, projects, events, ships,
+-- blockers, messages, and catchups. These tables only describe the temporary
+-- state of a live coworking event: who is present, what they intend to do,
+-- small focus items, bookable huddles, targeted alerts, and the demo queue.
 
-update public.build_log set category = 'Engineering'
-  where category in ('Auth/Login','Deploy/Infra','RAG/Retrieval','Agent loops','Rate limits/Cost','Data/Eval');
-update public.build_log set category = 'Design'  where category = 'UI polish';
-update public.build_log set category = 'Product' where category = 'Launch/Demo';
-update public.build_log set category = 'Other'   where category = 'Getting unstuck';
+alter table public.events
+  add column if not exists capacity integer check (capacity is null or capacity > 0);
+
+create table if not exists public.event_checkins (
+  id             uuid primary key default gen_random_uuid(),
+  event_id       uuid not null references public.events(id) on delete cascade,
+  user_id        uuid not null references public.profiles(id) on delete cascade,
+  project_id     uuid references public.projects(id) on delete set null,
+  goal           text not null default 'Open'
+                 check (goal in ('Deep work','Feedback','Networking','Collaboration','Open')),
+  intention      text not null,
+  checked_in_at  timestamptz not null default now(),
+  checked_out_at timestamptz,
+  updated_at     timestamptz not null default now(),
+  unique (event_id, user_id)
+);
+
+create index if not exists event_checkins_event_active_idx
+  on public.event_checkins (event_id, checked_out_at, checked_in_at);
+create index if not exists event_checkins_user_idx
+  on public.event_checkins (user_id, checked_in_at desc);
+
+-- Capacity is enforced transactionally, not just hidden in the UI. The
+-- per-event advisory lock serializes two people taking the final place.
+create or replace function public.enforce_event_checkin_capacity()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  event_capacity integer;
+  active_count integer;
+  event_starts timestamptz;
+  event_ends timestamptz;
+begin
+  if new.checked_out_at is not null then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' and old.checked_out_at is null and old.event_id = new.event_id then
+    return new;
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended(new.event_id::text, 0));
+  select capacity, starts_at, ends_at into event_capacity, event_starts, event_ends
+  from public.events where id = new.event_id;
+  if now() < event_starts or now() >= event_ends then
+    raise exception 'Check-in is only open while the event is live.' using errcode = 'P0001';
+  end if;
+  if event_capacity is null then return new; end if;
+
+  select count(*) into active_count
+  from public.event_checkins
+  where event_id = new.event_id
+    and checked_out_at is null
+    and id <> new.id;
+
+  if active_count >= event_capacity then
+    raise exception 'This event is at capacity.' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_event_checkin_capacity on public.event_checkins;
+create trigger enforce_event_checkin_capacity
+  before insert or update of event_id, checked_out_at on public.event_checkins
+  for each row execute function public.enforce_event_checkin_capacity();
+
+create table if not exists public.focus_items (
+  id           uuid primary key default gen_random_uuid(),
+  checkin_id   uuid not null references public.event_checkins(id) on delete cascade,
+  owner_id     uuid not null references public.profiles(id) on delete cascade,
+  title        text not null,
+  position     integer not null default 0,
+  completed_at timestamptz,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists focus_items_checkin_idx
+  on public.focus_items (checkin_id, position, created_at);
+
+create table if not exists public.event_spaces (
+  id          uuid primary key default gen_random_uuid(),
+  event_id    uuid not null references public.events(id) on delete cascade,
+  name        text not null,
+  description text,
+  capacity    integer check (capacity is null or capacity > 0),
+  created_at  timestamptz not null default now(),
+  unique (event_id, name)
+);
+
+create index if not exists event_spaces_event_idx on public.event_spaces (event_id, name);
+
+create table if not exists public.huddles (
+  id                 uuid primary key default gen_random_uuid(),
+  event_id           uuid not null references public.events(id) on delete cascade,
+  space_id           uuid references public.event_spaces(id) on delete set null,
+  host_id            uuid not null references public.profiles(id) on delete cascade,
+  topic              text not null,
+  kind               text not null default 'Discussion'
+                     check (kind in ('Discussion','Presentation','Asking for help','Networking')),
+  welcome_skills     text[] not null default '{}',
+  welcome_industries text[] not null default '{}',
+  starts_at          timestamptz not null,
+  ends_at            timestamptz not null,
+  status             text not null default 'scheduled'
+                     check (status in ('scheduled','live','ended','cancelled')),
+  created_at         timestamptz not null default now(),
+  check (ends_at > starts_at)
+);
+
+create index if not exists huddles_event_time_idx on public.huddles (event_id, starts_at, ends_at);
+create index if not exists huddles_space_time_idx on public.huddles (space_id, starts_at, ends_at);
+
+-- Keep bookings inside the event and prevent two huddles claiming one named
+-- space at the same time. The advisory lock closes the concurrent-booking gap.
+create or replace function public.enforce_huddle_booking()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  event_starts timestamptz;
+  event_ends timestamptz;
+begin
+  select starts_at, ends_at into event_starts, event_ends
+  from public.events where id = new.event_id;
+  if new.starts_at < event_starts or new.ends_at > event_ends then
+    raise exception 'Choose a huddle time inside the event window.' using errcode = 'P0001';
+  end if;
+
+  if new.space_id is not null and new.status <> 'cancelled' then
+    perform pg_advisory_xact_lock(hashtextextended(new.space_id::text, 0));
+    if exists (
+      select 1 from public.huddles h
+      where h.space_id = new.space_id
+        and h.id <> new.id
+        and h.status <> 'cancelled'
+        and h.starts_at < new.ends_at
+        and new.starts_at < h.ends_at
+    ) then
+      raise exception 'That space is already booked then.' using errcode = 'P0001';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_huddle_booking on public.huddles;
+create trigger enforce_huddle_booking
+  before insert or update of space_id, starts_at, ends_at, status on public.huddles
+  for each row execute function public.enforce_huddle_booking();
+
+create table if not exists public.huddle_participants (
+  huddle_id uuid not null references public.huddles(id) on delete cascade,
+  user_id   uuid not null references public.profiles(id) on delete cascade,
+  joined_at timestamptz not null default now(),
+  primary key (huddle_id, user_id)
+);
+
+create index if not exists huddle_participants_user_idx
+  on public.huddle_participants (user_id, joined_at desc);
+
+create or replace function public.enforce_huddle_capacity()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  space_capacity integer;
+  participant_count integer;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(new.huddle_id::text, 0));
+  select s.capacity into space_capacity
+  from public.huddles h
+  left join public.event_spaces s on s.id = h.space_id
+  where h.id = new.huddle_id;
+  if space_capacity is null then return new; end if;
+
+  select count(*) into participant_count
+  from public.huddle_participants where huddle_id = new.huddle_id;
+  if participant_count >= space_capacity then
+    raise exception 'This huddle space is at capacity.' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_huddle_capacity on public.huddle_participants;
+create trigger enforce_huddle_capacity
+  before insert on public.huddle_participants
+  for each row execute function public.enforce_huddle_capacity();
+
+create table if not exists public.event_demos (
+  id           uuid primary key default gen_random_uuid(),
+  event_id     uuid not null references public.events(id) on delete cascade,
+  user_id      uuid not null references public.profiles(id) on delete cascade,
+  post_id      uuid not null references public.build_log(id) on delete cascade,
+  status       text not null default 'queued' check (status in ('queued','presented','skipped')),
+  queued_at    timestamptz not null default now(),
+  presented_at timestamptz,
+  unique (event_id, user_id),
+  unique (event_id, post_id)
+);
+
+create index if not exists event_demos_queue_idx on public.event_demos (event_id, status, queued_at);
+
+create table if not exists public.event_notifications (
+  id           uuid primary key default gen_random_uuid(),
+  event_id     uuid not null references public.events(id) on delete cascade,
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  kind         text not null default 'huddle',
+  title        text not null,
+  body         text not null,
+  huddle_id    uuid references public.huddles(id) on delete cascade,
+  created_at   timestamptz not null default now(),
+  read_at      timestamptz,
+  unique (recipient_id, huddle_id)
+);
+
+create index if not exists event_notifications_recipient_idx
+  on public.event_notifications (recipient_id, read_at, created_at desc);
+
+-- RLS owns who may update a row; this trigger also keeps relationship identity
+-- immutable so an allowed status/intention update cannot silently move the row
+-- to another event or owner.
+create or replace function public.prevent_live_identity_change()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  column_name text;
+begin
+  foreach column_name in array tg_argv loop
+    if (to_jsonb(new) -> column_name) is distinct from (to_jsonb(old) -> column_name) then
+      raise exception '% cannot be changed on %.', column_name, tg_table_name using errcode = 'P0001';
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+
+drop trigger if exists protect_event_checkin_identity on public.event_checkins;
+create trigger protect_event_checkin_identity before update on public.event_checkins
+  for each row execute function public.prevent_live_identity_change('event_id', 'user_id');
+drop trigger if exists protect_focus_item_identity on public.focus_items;
+create trigger protect_focus_item_identity before update on public.focus_items
+  for each row execute function public.prevent_live_identity_change('checkin_id', 'owner_id');
+drop trigger if exists protect_huddle_identity on public.huddles;
+create trigger protect_huddle_identity before update on public.huddles
+  for each row execute function public.prevent_live_identity_change('event_id', 'host_id');
+drop trigger if exists protect_demo_identity on public.event_demos;
+create trigger protect_demo_identity before update on public.event_demos
+  for each row execute function public.prevent_live_identity_change('event_id', 'user_id');
+drop trigger if exists protect_event_notification_content on public.event_notifications;
+create trigger protect_event_notification_content before update on public.event_notifications
+  for each row execute function public.prevent_live_identity_change(
+    'event_id', 'recipient_id', 'kind', 'title', 'body', 'huddle_id', 'created_at'
+  );
+
+alter table public.event_checkins      enable row level security;
+alter table public.focus_items         enable row level security;
+alter table public.event_spaces        enable row level security;
+alter table public.huddles             enable row level security;
+alter table public.huddle_participants enable row level security;
+alter table public.event_demos         enable row level security;
+alter table public.event_notifications enable row level security;
+
+-- Presence is visible to the signed-in cohort. Builders write only their row;
+-- staff can correct any row from the organizer surface.
+drop policy if exists event_checkins_select on public.event_checkins;
+create policy event_checkins_select on public.event_checkins
+  for select to authenticated using (true);
+drop policy if exists event_checkins_insert_own on public.event_checkins;
+create policy event_checkins_insert_own on public.event_checkins
+  for insert to authenticated with check (auth.uid() = user_id);
+drop policy if exists event_checkins_update_own_or_admin on public.event_checkins;
+create policy event_checkins_update_own_or_admin on public.event_checkins
+  for update to authenticated using (auth.uid() = user_id or public.is_admin())
+  with check (
+    public.is_admin()
+    or (
+      auth.uid() = user_id
+      and (
+        checked_out_at is not null
+        or exists (
+          select 1 from public.events e
+          where e.id = event_checkins.event_id
+            and now() >= e.starts_at
+            and now() < e.ends_at
+        )
+      )
+    )
+  );
+drop policy if exists event_checkins_delete_own_or_admin on public.event_checkins;
+create policy event_checkins_delete_own_or_admin on public.event_checkins
+  for delete to authenticated using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists focus_items_select on public.focus_items;
+create policy focus_items_select on public.focus_items
+  for select to authenticated using (true);
+drop policy if exists focus_items_insert_own on public.focus_items;
+create policy focus_items_insert_own on public.focus_items
+  for insert to authenticated with check (
+    auth.uid() = owner_id
+    and exists (
+      select 1 from public.event_checkins c
+      join public.events e on e.id = c.event_id
+      where c.id = checkin_id
+        and c.user_id = auth.uid()
+        and c.checked_out_at is null
+        and now() >= e.starts_at
+        and now() < e.ends_at
+    )
+  );
+drop policy if exists focus_items_update_own_or_admin on public.focus_items;
+create policy focus_items_update_own_or_admin on public.focus_items
+  for update to authenticated using (auth.uid() = owner_id or public.is_admin())
+  with check (
+    public.is_admin()
+    or (
+      auth.uid() = owner_id
+      and exists (
+        select 1 from public.event_checkins c
+        join public.events e on e.id = c.event_id
+        where c.id = focus_items.checkin_id
+          and c.user_id = auth.uid()
+          and c.checked_out_at is null
+          and now() >= e.starts_at
+          and now() < e.ends_at
+      )
+    )
+  );
+drop policy if exists focus_items_delete_own_or_admin on public.focus_items;
+create policy focus_items_delete_own_or_admin on public.focus_items
+  for delete to authenticated using (auth.uid() = owner_id or public.is_admin());
+
+drop policy if exists event_spaces_select on public.event_spaces;
+create policy event_spaces_select on public.event_spaces
+  for select to authenticated using (true);
+drop policy if exists event_spaces_insert_admin on public.event_spaces;
+create policy event_spaces_insert_admin on public.event_spaces
+  for insert to authenticated with check (public.is_admin());
+drop policy if exists event_spaces_update_admin on public.event_spaces;
+create policy event_spaces_update_admin on public.event_spaces
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists event_spaces_delete_admin on public.event_spaces;
+create policy event_spaces_delete_admin on public.event_spaces
+  for delete to authenticated using (public.is_admin());
+
+drop policy if exists huddles_select on public.huddles;
+create policy huddles_select on public.huddles
+  for select to authenticated using (true);
+drop policy if exists huddles_insert_own on public.huddles;
+create policy huddles_insert_own on public.huddles
+  for insert to authenticated with check (
+    auth.uid() = host_id
+    and exists (
+      select 1 from public.event_checkins c
+      join public.events e on e.id = c.event_id
+      where c.event_id = huddles.event_id
+        and c.user_id = auth.uid()
+        and c.checked_out_at is null
+        and now() >= e.starts_at
+        and now() < e.ends_at
+    )
+  );
+drop policy if exists huddles_update_own_or_admin on public.huddles;
+create policy huddles_update_own_or_admin on public.huddles
+  for update to authenticated using (auth.uid() = host_id or public.is_admin())
+  with check (auth.uid() = host_id or public.is_admin());
+drop policy if exists huddles_delete_own_or_admin on public.huddles;
+create policy huddles_delete_own_or_admin on public.huddles
+  for delete to authenticated using (auth.uid() = host_id or public.is_admin());
+
+drop policy if exists huddle_participants_select on public.huddle_participants;
+create policy huddle_participants_select on public.huddle_participants
+  for select to authenticated using (true);
+drop policy if exists huddle_participants_insert_own on public.huddle_participants;
+create policy huddle_participants_insert_own on public.huddle_participants
+  for insert to authenticated with check (
+    auth.uid() = user_id
+    and exists (
+      select 1
+      from public.huddles h
+      join public.event_checkins c on c.event_id = h.event_id
+      where h.id = huddle_id
+        and c.user_id = auth.uid()
+        and c.checked_out_at is null
+        and h.status in ('scheduled', 'live')
+        and now() < h.ends_at
+    )
+  );
+drop policy if exists huddle_participants_delete_own_or_admin on public.huddle_participants;
+create policy huddle_participants_delete_own_or_admin on public.huddle_participants
+  for delete to authenticated using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists event_demos_select on public.event_demos;
+create policy event_demos_select on public.event_demos
+  for select to authenticated using (true);
+drop policy if exists event_demos_insert_own on public.event_demos;
+create policy event_demos_insert_own on public.event_demos
+  for insert to authenticated with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.build_log b
+      where b.id = post_id and b.author_id = auth.uid() and b.event_id = event_demos.event_id
+    )
+    and exists (
+      select 1 from public.event_checkins c
+      join public.events e on e.id = c.event_id
+      where c.event_id = event_demos.event_id
+        and c.user_id = auth.uid()
+        and c.checked_out_at is null
+        and now() >= e.starts_at
+        and now() < e.ends_at
+    )
+  );
+drop policy if exists event_demos_update_own_or_admin on public.event_demos;
+create policy event_demos_update_own_or_admin on public.event_demos
+  for update to authenticated using (auth.uid() = user_id or public.is_admin())
+  with check (
+    public.is_admin()
+    or (
+      auth.uid() = user_id
+      and exists (
+        select 1 from public.build_log b
+        where b.id = post_id and b.author_id = auth.uid() and b.event_id = event_demos.event_id
+      )
+      and exists (
+        select 1 from public.event_checkins c
+        join public.events e on e.id = c.event_id
+        where c.event_id = event_demos.event_id
+          and c.user_id = auth.uid()
+          and c.checked_out_at is null
+          and now() >= e.starts_at
+          and now() < e.ends_at
+      )
+    )
+  );
+drop policy if exists event_demos_delete_own_or_admin on public.event_demos;
+create policy event_demos_delete_own_or_admin on public.event_demos
+  for delete to authenticated using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists event_notifications_select_own on public.event_notifications;
+create policy event_notifications_select_own on public.event_notifications
+  for select to authenticated using (auth.uid() = recipient_id);
+drop policy if exists event_notifications_update_own on public.event_notifications;
+create policy event_notifications_update_own on public.event_notifications
+  for update to authenticated using (auth.uid() = recipient_id)
+  with check (auth.uid() = recipient_id);
+drop policy if exists event_notifications_delete_own on public.event_notifications;
+create policy event_notifications_delete_own on public.event_notifications
+  for delete to authenticated using (auth.uid() = recipient_id);
+
+-- New huddles notify checked-in builders whose profile matches the requested
+-- skills or industries. With no audience filters, everyone currently present
+-- receives the alert. The host is excluded.
+create or replace function public.notify_huddle_audience()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.event_notifications (
+    event_id, recipient_id, kind, title, body, huddle_id
+  )
+  select
+    new.event_id,
+    c.user_id,
+    'huddle',
+    new.kind || ': ' || new.topic,
+    coalesce(p.name, 'A builder') || ' booked a huddle that may be relevant to you.',
+    new.id
+  from public.event_checkins c
+  join public.profiles p on p.id = new.host_id
+  join public.profiles recipient on recipient.id = c.user_id
+  where c.event_id = new.event_id
+    and c.checked_out_at is null
+    and c.user_id <> new.host_id
+    and (
+      (cardinality(new.welcome_skills) = 0 and cardinality(new.welcome_industries) = 0)
+      or recipient.skills && new.welcome_skills
+      or recipient.industries && new.welcome_industries
+    )
+  on conflict (recipient_id, huddle_id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_huddle_created on public.huddles;
+create trigger on_huddle_created
+  after insert on public.huddles
+  for each row execute function public.notify_huddle_audience();
+
+-- These event-sized streams remain small and benefit from immediate updates.
+do $$ begin
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='event_checkins') then
+    alter publication supabase_realtime add table public.event_checkins;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='focus_items') then
+    alter publication supabase_realtime add table public.focus_items;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='event_spaces') then
+    alter publication supabase_realtime add table public.event_spaces;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='huddles') then
+    alter publication supabase_realtime add table public.huddles;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='huddle_participants') then
+    alter publication supabase_realtime add table public.huddle_participants;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='event_demos') then
+    alter publication supabase_realtime add table public.event_demos;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='event_notifications') then
+    alter publication supabase_realtime add table public.event_notifications;
+  end if;
+end $$;
+
+
+-- ─────────────────────────────────────────────────────────
+-- db/migrations/032_staff_event_operators.sql
+-- ─────────────────────────────────────────────────────────
+-- 032 staff event operators: one operational role for Circuit.
+--
+-- Build Club staff (public.admins) create and operate every event. The legacy
+-- event_members.role column was never read or enforced, and its original join
+-- policy allowed a builder to choose its value. Removing it prevents a second,
+-- misleading authorization path: event_members now represents participation
+-- only, while public.is_admin() remains the sole staff capability check.
+
+alter table public.event_members
+  drop column if exists role;
 
 
 -- ─────────────────────────────────────────────────────────
@@ -924,7 +1612,7 @@ update public.build_log set category = 'Other'   where category = 'Getting unstu
 -- ─────────────────────────────────────────────────────────
 -- Blockers are not seeded: the stuck feed shows only real builder posts. (An
 -- earlier build seeded null-author "community" blockers; migration 029 removed
--- them from live data, and this fresh-install script no longer adds them.)
+-- them.)
 
 -- seed events as episodes: one live now, one upcoming. Dates are relative to
 -- now() so the Events page always shows a useful mix. created_by is null (no
@@ -933,4 +1621,3 @@ insert into public.events (slug, name, tagline, location, starts_at, ends_at) va
   ('aabw-hcmc',      'Agentic AI Build Week', 'Five days, one build, shipped live.', 'Ho Chi Minh City', now() - interval '1 day',  now() + interval '4 days'),
   ('circuit-sprint', 'Circuit Launch Sprint', 'A weekend to ship your next thing.',  'Online',           now() + interval '7 days', now() + interval '9 days')
 on conflict (slug) do nothing;
-

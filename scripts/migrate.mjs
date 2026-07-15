@@ -41,6 +41,20 @@ if (!url) {
   process.exit(1)
 }
 
+// CI/release callers pin the expected project reference. Supabase pooler URLs
+// can carry it in either the hostname or username, so check both before making
+// a network connection. This prevents a copied secret from targeting the wrong
+// database environment.
+const expectedProjectRef = process.env.EXPECTED_SUPABASE_PROJECT_REF?.trim()
+if (expectedProjectRef) {
+  const parsed = new URL(url)
+  const targetIdentity = `${parsed.username}@${parsed.hostname}`
+  if (!targetIdentity.includes(expectedProjectRef)) {
+    console.error(`Refusing database target that does not match expected project ${expectedProjectRef}.`)
+    process.exit(1)
+  }
+}
+
 // Supabase requires SSL; skip verification for the local case only.
 const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url)
 const ssl = isLocal ? false : { rejectUnauthorized: false }

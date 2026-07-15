@@ -14,6 +14,7 @@ const BARE_PATHS = ["/", "/login", "/auth/callback", "/welcome"]
 
 function isBare(pathname: string): boolean {
   return BARE_PATHS.some(p => pathname === p || (p !== "/" && pathname.startsWith(p + "/")))
+    || /^\/events\/[^/]+\/board$/.test(pathname)
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {

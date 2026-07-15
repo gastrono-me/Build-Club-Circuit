@@ -1,11 +1,12 @@
 "use client"
 
 import React from "react"
-import { CalendarDays } from "lucide-react"
+import { CalendarDays, Radio } from "lucide-react"
 import { Avatar } from "@/components/shell/Avatar"
 import type { CatchupAgendaRow } from "@/lib/hooks/useCatchups"
 import type { ActivityRow } from "@/lib/hooks/useActivity"
 import type { InboxConversation } from "@/components/shell/SocialProvider"
+import type { EventNotification } from "@/lib/coworking/types"
 import { catchupWhen } from "@/lib/time"
 import { colors, fonts, fontSize, fontWeight, spacing, radii } from "@/lib/design/tokens"
 
@@ -23,6 +24,51 @@ export function relTime(iso: string): string {
 }
 
 export type NotificationVariant = "dropdown" | "drawer"
+
+/** A targeted live-event alert generated for a checked-in builder. */
+export function EventAlertRow({
+  notification,
+  variant,
+  onClick,
+}: {
+  notification: EventNotification
+  variant: NotificationVariant
+  onClick: () => void
+}) {
+  const dropdown = variant === "dropdown"
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: spacing[2],
+        width: "100%",
+        padding: dropdown ? `${spacing[3]}px` : `${spacing[2]}px`,
+        background: notification.read_at ? "transparent" : colors.violetSoft,
+        border: "none",
+        borderBottom: `1px solid ${colors.line}`,
+        borderRadius: dropdown ? 0 : radii.md,
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      <Radio size={16} color={colors.violet} style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: spacing[1] }}>
+          <span style={{ fontFamily: fonts.body, fontSize: fontSize.meta, fontWeight: fontWeight.medium, color: colors.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {notification.title}
+          </span>
+          <span style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft }}>{relTime(notification.created_at)}</span>
+        </div>
+        <span style={{ display: "block", fontFamily: fonts.body, fontSize: fontSize.micro, color: colors.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {notification.body}
+        </span>
+      </div>
+      {!notification.read_at && <span style={{ width: 8, height: 8, borderRadius: radii.pill, background: colors.violet, flexShrink: 0 }} />}
+    </button>
+  )
+}
 
 /** A pending catchup request row, shared between TopBar's bell dropdown and MobileMenu's drawer. */
 export function CatchupRequestRow({

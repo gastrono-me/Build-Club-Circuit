@@ -12,9 +12,13 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   const pathname = request.nextUrl.pathname
   // The landing ('/') is public to everyone; '/login' redirects to it; the OAuth
-  // callback must stay reachable while signing in.
+  // callback must stay reachable while signing in; and the health endpoint must
+  // be observable without a user session during deployment and monitoring.
   const isPublic =
-    pathname === '/' || pathname === '/login' || pathname.startsWith('/auth/callback')
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/api/health' ||
+    pathname.startsWith('/auth/callback')
 
   const hasAuthCookie = request.cookies
     .getAll()

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import Link from "next/link"
-import { CalendarRange, Pencil, Trash2, Plus, MonitorPlay } from "lucide-react"
+import { Archive, Ban, CalendarRange, Pencil, Plus, MonitorPlay, RotateCcw, SlidersHorizontal } from "lucide-react"
 import { useEvents, type EventRow } from "@/lib/hooks/useEvents"
 import { eventStatus } from "@/lib/events/eventStatus"
 import { SectionTitle } from "@/components/ui/SectionTitle"
@@ -32,14 +32,15 @@ interface Draft {
   name: string
   tagline: string
   location: string
+  capacity: string
   starts_at: string // datetime-local value
   ends_at: string
 }
 
-const EMPTY: Draft = { slug: "", name: "", tagline: "", location: "", starts_at: "", ends_at: "" }
+const EMPTY: Draft = { slug: "", name: "", tagline: "", location: "", capacity: "", starts_at: "", ends_at: "" }
 
 export function AdminView() {
-  const { events, memberCounts, loading, create, update, remove } = useEvents()
+  const { events, memberCounts, loading, create, update, cancel: cancelEvent, reopen, archive, restore } = useEvents({ includeArchived: true })
   const [now] = useState(() => new Date())
 
   const [editingId, setEditingId] = useState<string | null>(null) // null = closed, "new" = create
@@ -47,6 +48,7 @@ export function AdminView() {
   const [slugTouched, setSlugTouched] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   function openCreate() {
     setDraft(EMPTY); setSlugTouched(false); setError(null); setEditingId("new")
@@ -57,6 +59,7 @@ export function AdminView() {
       name: e.name,
       tagline: e.tagline ?? "",
       location: e.location ?? "",
+      capacity: e.capacity ? String(e.capacity) : "",
       starts_at: toLocalInput(e.starts_at),
       ends_at: toLocalInput(e.ends_at),
     })
@@ -80,6 +83,7 @@ export function AdminView() {
         name: draft.name,
         tagline: draft.tagline,
         location: draft.location,
+        capacity: draft.capacity ? Number(draft.capacity) : null,
         starts_at: fromLocalInput(draft.starts_at),
         ends_at: fromLocalInput(draft.ends_at),
       }
@@ -94,12 +98,22 @@ export function AdminView() {
     }
   }
 
-  async function handleDelete(ev: EventRow) {
-    if (!window.confirm(`Delete "${ev.name}"? Members lose the event; their ships and blockers stay in the log.`)) return
+  async function runLifecycle(action: "cancel" | "reopen" | "archive" | "restore", ev: EventRow) {
+    const messages = {
+      cancel: `Cancel "${ev.name}"? Active check-ins will close and scheduled huddles will be cancelled.`,
+      reopen: `Reopen "${ev.name}"? Its original dates still determine whether it is live.`,
+      archive: `Archive "${ev.name}"? It will leave the public event list but its history will remain.`,
+      restore: `Restore "${ev.name}" to the event list?`,
+    }
+    if (!window.confirm(messages[action])) return
+    setActionError(null)
     try {
-      await remove(ev.id)
-    } catch (err) {
-      console.error("[admin] delete event failed:", err)
+      if (action === "cancel") await cancelEvent(ev.id)
+      else if (action === "reopen") await reopen(ev.id)
+      else if (action === "archive") await archive(ev.id)
+      else await restore(ev.id)
+    } catch (err: any) {
+      setActionError(err?.message ?? `Could not ${action} event.`)
     }
   }
 
@@ -125,6 +139,8 @@ export function AdminView() {
         </div>
       )}
 
+      {actionError && <p role="alert" style={{ margin: `0 0 ${spacing[4]}px`, fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.live }}>{actionError}</p>}
+
       {editingId !== null && (
         <Card spine="violet" padding={spacing[4]} style={{ margin: `${spacing[4]}px 0 ${spacing[6]}px` }}>
           <form onSubmit={save} style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
@@ -135,6 +151,7 @@ export function AdminView() {
             <Input label="Slug (URL handle)" value={draft.slug} onChange={(e) => { setSlugTouched(true); setDraft((d) => ({ ...d, slug: slugify(e.target.value) })) }} placeholder="circuit-sprint" required />
             <Input label="Tagline (optional)" value={draft.tagline} onChange={(e) => setDraft((d) => ({ ...d, tagline: e.target.value }))} placeholder="A weekend to ship your next thing." />
             <Input label="Location (optional)" value={draft.location} onChange={(e) => setDraft((d) => ({ ...d, location: e.target.value }))} placeholder="Online, or a city" />
+            <Input label="Capacity (optional)" type="number" min="1" value={draft.capacity} onChange={(e) => setDraft((d) => ({ ...d, capacity: e.target.value }))} placeholder="80" />
             <div style={{ display: "flex", gap: spacing[3], flexWrap: "wrap" }}>
               <label style={{ flex: "1 1 160px", ...labelStyle }}>
                 <span style={labelText}>Starts</span>
@@ -163,24 +180,44 @@ export function AdminView() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: spacing[3] }}>
           {events.map((ev) => {
-            const { phase } = eventStatus(ev.starts_at, ev.ends_at, now)
+            const { phase } = eventStatus(ev.starts_at, ev.ends_at, now, ev.cancelled_at)
+            const archived = !!ev.archived_at
             return (
-              <Card key={ev.id} padding={spacing[4]}>
+              <Card key={ev.id} padding={spacing[4]} data-testid={`admin-event-${ev.slug}`}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: spacing[3] }}>
                   <CalendarRange size={18} color={colors.violet} style={{ marginTop: 2, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: spacing[2], flexWrap: "wrap" }}>
                       <span style={{ fontFamily: fonts.display, fontWeight: fontWeight.semibold, fontSize: fontSize.heading, color: colors.ink }}>{ev.name}</span>
-                      <PhaseTag phase={phase} />
+                      <PhaseTag phase={phase} archived={archived} />
                     </div>
                     <div style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, color: colors.mutedSoft, marginTop: 2 }}>
                       /{ev.slug} · {memberCounts[ev.id] ?? 0} member{(memberCounts[ev.id] ?? 0) === 1 ? "" : "s"} · {fmtRange(ev.starts_at, ev.ends_at)}
                     </div>
                     {ev.tagline && <div style={{ fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted, marginTop: spacing[1] }}>{ev.tagline}</div>}
                   </div>
-                  <div style={{ display: "flex", gap: spacing[1], flexShrink: 0 }}>
-                    <Button variant="ghost" size="sm" icon={<Pencil size={13} />} onClick={() => openEdit(ev)}>Edit</Button>
-                    <Button variant="danger" size="sm" icon={<Trash2 size={13} />} onClick={() => handleDelete(ev)}>Delete</Button>
+                  <div style={{ display: "flex", gap: spacing[1], flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {archived ? (
+                      <Button variant="secondary" size="sm" icon={<RotateCcw size={13} />} onClick={() => runLifecycle("restore", ev)}>Restore</Button>
+                    ) : (
+                      <>
+                        <Link href={`/admin/events/${ev.id}`} style={{ textDecoration: "none" }}>
+                          <Button variant="ghost" size="sm" icon={<SlidersHorizontal size={13} />}>Operate</Button>
+                        </Link>
+                        <Link href={`/events/${ev.slug}/board`} style={{ textDecoration: "none" }}>
+                          <Button variant="ghost" size="sm" icon={<MonitorPlay size={13} />}>Board</Button>
+                        </Link>
+                        <Button variant="ghost" size="sm" icon={<Pencil size={13} />} onClick={() => openEdit(ev)}>Edit</Button>
+                        {phase === "cancelled" ? (
+                          <Button variant="secondary" size="sm" icon={<RotateCcw size={13} />} onClick={() => runLifecycle("reopen", ev)}>Reopen</Button>
+                        ) : phase !== "ended" ? (
+                          <Button variant="danger" size="sm" icon={<Ban size={13} />} onClick={() => runLifecycle("cancel", ev)}>Cancel event</Button>
+                        ) : null}
+                        {(phase === "ended" || phase === "cancelled") && (
+                          <Button variant="ghost" size="sm" icon={<Archive size={13} />} onClick={() => runLifecycle("archive", ev)}>Archive</Button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -192,13 +229,15 @@ export function AdminView() {
   )
 }
 
-function PhaseTag({ phase }: { phase: string }) {
+function PhaseTag({ phase, archived = false }: { phase: string; archived?: boolean }) {
   const map: Record<string, { bg: string; fg: string; label: string }> = {
     live: { bg: colors.goSoft, fg: colors.go, label: "Live" },
     upcoming: { bg: colors.violetSoft, fg: colors.violet, label: "Upcoming" },
     ended: { bg: colors.panel, fg: colors.muted, label: "Ended" },
+    cancelled: { bg: colors.liveSoft, fg: colors.oxblood, label: "Cancelled" },
+    archived: { bg: colors.paper2, fg: colors.mutedSoft, label: "Archived" },
   }
-  const s = map[phase] ?? map.ended
+  const s = archived ? map.archived : (map[phase] ?? map.ended)
   return (
     <span style={{ fontFamily: fonts.mono, fontSize: fontSize.micro, letterSpacing: "0.06em", textTransform: "uppercase", color: s.fg, background: s.bg, borderRadius: radii.pill, padding: "2px 9px" }}>
       {s.label}

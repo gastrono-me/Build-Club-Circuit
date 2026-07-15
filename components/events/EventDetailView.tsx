@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Check, Users as UsersIcon } from "lucide-react"
+import { ArrowLeft, Check, MonitorPlay, Users as UsersIcon } from "lucide-react"
 import { useEvents } from "@/lib/hooks/useEvents"
 import { eventStatus, type EventPhase } from "@/lib/events/eventStatus"
 import { RadarFeed } from "@/components/radar/RadarFeed"
@@ -13,6 +13,8 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/desig
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { useNow } from "@/lib/hooks/useNow"
 import { useSocial } from "@/components/shell/SocialProvider"
+import { useIsAdmin } from "@/lib/hooks/useIsAdmin"
+import { CoworkingEvent } from "@/components/coworking/CoworkingEvent"
 
 type Scope = "event" | "all"
 
@@ -23,6 +25,7 @@ type Scope = "event" | "all"
  */
 export function EventDetailView({ slug }: { slug: string }) {
   const { events, joined, memberCounts, loading, join, leave } = useEvents()
+  const { isAdmin } = useIsAdmin()
   const now = useNow()
   const [scope, setScope] = useState<Scope>("event")
   const [busy, setBusy] = useState(false)
@@ -55,7 +58,7 @@ export function EventDetailView({ slug }: { slug: string }) {
   }
 
   const eventId = event.id
-  const { phase } = eventStatus(event.starts_at, event.ends_at, now)
+  const { phase } = eventStatus(event.starts_at, event.ends_at, now, event.cancelled_at)
   const isJoined = joined.has(event.id)
   const memberCount = memberCounts[event.id] ?? 0
 
@@ -89,7 +92,7 @@ export function EventDetailView({ slug }: { slug: string }) {
         <ArrowLeft size={13} /> Events
       </Link>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing[3], marginBottom: spacing[5] }}>
+      <div className="event-detail-hero" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing[3], marginBottom: spacing[5] }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <PhaseBadge phase={phase} />
           <h1
@@ -135,19 +138,34 @@ export function EventDetailView({ slug }: { slug: string }) {
           )}
         </div>
 
-        {phase !== "ended" && (
-          <Button
-            variant={isJoined ? "secondary" : "accent"}
-            size="sm"
-            disabled={busy}
-            onClick={toggleJoin}
-            icon={isJoined ? <Check size={14} /> : undefined}
-            style={{ flexShrink: 0 }}
-          >
-            {busy ? "…" : isJoined ? "Joined" : "Join"}
-          </Button>
-        )}
+        <div className="event-detail-actions" style={{ display: "flex", gap: spacing[2], flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {isAdmin && (
+            <Link href={`/events/${event.slug}/board`} style={{ textDecoration: "none" }}>
+              <Button variant="secondary" size="sm" icon={<MonitorPlay size={14} />}>Live board</Button>
+            </Link>
+          )}
+          {phase !== "ended" && phase !== "cancelled" && (
+            <Button
+              variant={isJoined ? "secondary" : "accent"}
+              size="sm"
+              disabled={busy}
+              onClick={toggleJoin}
+              icon={isJoined ? <Check size={14} /> : undefined}
+            >
+              {busy ? "…" : isJoined ? "Joined" : "Join"}
+            </Button>
+          )}
+        </div>
       </div>
+
+      <CoworkingEvent
+        eventId={event.id}
+        eventName={event.name}
+        startsAt={event.starts_at}
+        endsAt={event.ends_at}
+        capacity={event.capacity}
+        cancelled={phase === "cancelled"}
+      />
 
       {/* Event-scoped vs global roll-up toggle */}
       <div
@@ -221,6 +239,7 @@ function PhaseBadge({ phase }: { phase: EventPhase }) {
     live: { label: "LIVE", color: colors.oxblood, bg: colors.liveSoft },
     upcoming: { label: "UPCOMING", color: colors.violet, bg: colors.violetSoft },
     ended: { label: "ENDED", color: colors.muted, bg: colors.paper2 },
+    cancelled: { label: "CANCELLED", color: colors.oxblood, bg: colors.liveSoft },
   }
   const m = map[phase]
   return (

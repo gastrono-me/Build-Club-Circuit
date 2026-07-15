@@ -5,6 +5,11 @@ dist
 .env.local
 .vercel
 tsconfig.tsbuildinfo
+.playwright-cli/
+output/
+playwright-report/
+test-results/
+.e2e/
 
 # local SDD scratch (plans, ledger, reference) — never commit
 .superpowers/

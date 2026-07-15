@@ -195,6 +195,18 @@ html {
   color: var(--ink);
 }
 
+/* Keep event titles readable beside staff controls on narrow screens. */
+@media (max-width: 600px) {
+  .event-detail-hero {
+    flex-direction: column;
+  }
+
+  .event-detail-actions {
+    justify-content: flex-start !important;
+    width: 100%;
+  }
+}
+
 /* ---------------- Reduced motion ---------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *,

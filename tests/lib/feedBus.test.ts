@@ -97,8 +97,10 @@ describe("feedBus", () => {
   })
 
   it("notifyFeed sends a changed ping on the live channel", () => {
-    subscribeFeed(BUILD_LOG_TOPIC, vi.fn())
+    const local = vi.fn()
+    subscribeFeed(BUILD_LOG_TOPIC, local)
     notifyFeed(BUILD_LOG_TOPIC)
+    expect(local).toHaveBeenCalledTimes(1)
     expect(channels[0].sent).toEqual([{ type: "broadcast", event: "changed", payload: {} }])
   })
 

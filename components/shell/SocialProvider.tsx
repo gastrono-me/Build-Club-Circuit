@@ -4,6 +4,8 @@ import React, { createContext, useContext, useState } from "react"
 import { useCatchups, type CatchupAgendaRow } from "@/lib/hooks/useCatchups"
 import { useInbox, type InboxConversation } from "@/lib/hooks/useInbox"
 import { useActivity, type ActivityRow } from "@/lib/hooks/useActivity"
+import { useEventNotifications } from "@/lib/hooks/useEventNotifications"
+import type { EventNotification } from "@/lib/coworking/types"
 import { PersonPanel } from "@/components/people/PersonPanel"
 
 export type { InboxConversation }
@@ -35,6 +37,10 @@ interface SocialApi {
   unreadActivity: number
   /** Mark all activity seen (called when the notifications surface opens). */
   markActivityRead: () => void
+  /** Targeted live-event alerts, such as relevant huddles starting in the room. */
+  eventNotifications: EventNotification[]
+  unreadEventNotifications: number
+  markEventNotificationRead: (id: string) => Promise<void>
 }
 
 const SocialContext = createContext<SocialApi | null>(null)
@@ -43,6 +49,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   const { catchups, cancel: cancelCatchup } = useCatchups()
   const { conversations: inbox, totalUnread, markRead } = useInbox()
   const { activity, unreadActivity, markActivityRead } = useActivity()
+  const { notifications: eventNotifications, unread: unreadEventNotifications, markRead: markEventNotificationRead } = useEventNotifications()
   const [panelPerson, setPanelPerson] = useState<ChatPerson | null>(null)
   const [panelFocus, setPanelFocus] = useState<"profile" | "chat" | "catchup">("profile")
 
@@ -65,6 +72,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     activity,
     unreadActivity,
     markActivityRead,
+    eventNotifications,
+    unreadEventNotifications,
+    markEventNotificationRead,
   }
 
   return (

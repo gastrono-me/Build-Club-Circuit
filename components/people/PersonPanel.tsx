@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { X, Send, AlertTriangle, Check, CalendarDays, Linkedin, Github, Twitter, Instagram, Pencil } from "lucide-react"
+import { X, Send, AlertTriangle, AtSign, BriefcaseBusiness, CalendarDays, Camera, Check, Code2, Pencil } from "lucide-react"
 import { Avatar } from "@/components/shell/Avatar"
 import { Button } from "@/components/ui/Button"
 import { Tag } from "@/components/ui/Tag"
@@ -55,10 +55,10 @@ export function PersonPanel({ person, focus, onClose }: PersonPanelProps) {
   const looking = profile?.looking ?? person.looking ?? []
   const links = profile?.links ?? {}
   const socials = [
-    links.linkedin && { href: links.linkedin, label: "LinkedIn", icon: <Linkedin size={14} /> },
-    links.github && { href: links.github, label: "GitHub", icon: <Github size={14} /> },
-    links.x && { href: links.x, label: "X", icon: <Twitter size={14} /> },
-    links.instagram && { href: links.instagram, label: "Instagram", icon: <Instagram size={14} /> },
+    links.linkedin && { href: links.linkedin, label: "LinkedIn", icon: <BriefcaseBusiness size={14} /> },
+    links.github && { href: links.github, label: "GitHub", icon: <Code2 size={14} /> },
+    links.x && { href: links.x, label: "X", icon: <AtSign size={14} /> },
+    links.instagram && { href: links.instagram, label: "Instagram", icon: <Camera size={14} /> },
   ].filter(Boolean) as { href: string; label: string; icon: React.ReactNode }[]
   const isMe = meId != null && meId === person.id
 
