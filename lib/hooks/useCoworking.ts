@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useNow } from "@/lib/hooks/useNow"
+import { BUILD_LOG_TOPIC, subscribeFeed } from "@/lib/realtime/feedBus"
 import type {
   CoworkingGoal,
   EventCheckin,
@@ -204,6 +205,14 @@ export function useCoworking(eventId: string | null, startsAt?: string | null, e
       .on("postgres_changes", { event: "*", schema: "public", table: "event_demos", filter: `event_id=eq.${eventId}` }, refresh)
       .subscribe()
     return () => { supabase.removeChannel(channel) }
+  }, [eventId, fetchAll])
+
+  // Event ships use the shared Broadcast feed rather than postgres_changes.
+  // Listen to that same topic so a newly logged ship is immediately available
+  // to the lightning-demo selector without a page reload.
+  useEffect(() => {
+    if (!eventId) return
+    return subscribeFeed(BUILD_LOG_TOPIC, fetchAll)
   }, [eventId, fetchAll])
 
   const eventIsLive = !startsAt || !endsAt || (!!now && now >= new Date(startsAt) && now < new Date(endsAt))

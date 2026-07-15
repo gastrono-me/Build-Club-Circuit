@@ -66,13 +66,14 @@ export function subscribeFeed(topic: string, onChanged: () => void): () => void 
 }
 
 /**
- * Tell every client on a topic that the table changed. The sender does not
- * receive its own ping (broadcast self defaults off), so a writer should refetch
- * locally in addition to calling this.
+ * Tell every client on a topic that the table changed. Supabase Broadcast does
+ * not echo to the sender by default, so notify local listeners directly before
+ * sending the cross-client ping.
  */
 export function notifyFeed(topic: string): void {
   const entry = registry.get(topic)
   if (entry) {
+    for (const fn of entry.listeners) fn()
     entry.channel.send({ type: "broadcast", event: "changed", payload: {} })
     return
   }

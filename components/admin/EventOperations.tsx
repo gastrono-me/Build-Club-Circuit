@@ -18,9 +18,11 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing } from "@/lib/desig
 export function EventOperations({ eventId }: { eventId: string }) {
   const { events, loading: eventsLoading } = useEvents()
   const event = events.find((row) => row.id === eventId) ?? null
-  const coworking = useCoworking(event?.id ?? null, event?.starts_at, event?.ends_at)
-  const buildLog = useBuildLog(event?.id ?? null)
-  const radar = useRadar(event?.id ?? null)
+  // The route already supplies the event id. Scope data hooks immediately so
+  // they never issue a transient global query while event metadata loads.
+  const coworking = useCoworking(eventId, event?.starts_at, event?.ends_at)
+  const buildLog = useBuildLog(eventId)
+  const radar = useRadar(eventId)
   const [spaceName, setSpaceName] = useState("")
   const [spaceCapacity, setSpaceCapacity] = useState("")
   const [busy, setBusy] = useState(false)

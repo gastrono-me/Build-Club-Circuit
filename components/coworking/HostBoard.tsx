@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import QRCode from "react-qr-code"
 import { ArrowLeft, Check, MonitorPlay, Radio, Users } from "lucide-react"
-import { useEvents } from "@/lib/hooks/useEvents"
+import { useEvents, type EventRow } from "@/lib/hooks/useEvents"
 import { useCoworking } from "@/lib/hooks/useCoworking"
 import { useBuildLog } from "@/lib/hooks/useBuildLog"
 import { useRadar } from "@/lib/hooks/useRadar"
@@ -15,11 +15,23 @@ import { colors, fonts, fontSize, fontWeight, radii, spacing, shadows } from "@/
 export function HostBoard({ slug }: { slug: string }) {
   const { events, loading: eventsLoading } = useEvents()
   const event = events.find((row) => row.slug === slug) ?? null
-  const coworking = useCoworking(event?.id ?? null, event?.starts_at, event?.ends_at)
-  const buildLog = useBuildLog(event?.id ?? null)
-  const radar = useRadar(event?.id ?? null)
+
+  if (eventsLoading || !event) {
+    return <div style={{ minHeight: "100vh", background: colors.ink }} />
+  }
+
+  return <EventHostBoard event={event} />
+}
+
+function EventHostBoard({ event }: { event: EventRow }) {
+  // Mount scoped hooks only after the slug resolves. This prevents an initial
+  // global feed response racing and overwriting the event-scoped board counts.
+  const coworking = useCoworking(event.id, event.starts_at, event.ends_at)
+  const buildLog = useBuildLog(event.id)
+  const radar = useRadar(event.id)
   const [origin, setOrigin] = useState("")
   const [now, setNow] = useState(() => new Date())
+  const slug = event.slug
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -33,7 +45,7 @@ export function HostBoard({ slug }: { slug: string }) {
   const activeBlockers = radar.blockers.filter((blocker) => !blocker.resolved_at)
   const displayDemos = coworking.demos.filter((demo) => demo.status !== "skipped")
 
-  if (eventsLoading || coworking.loading || !event) {
+  if (coworking.loading || buildLog.loading || radar.loading) {
     return <div style={{ minHeight: "100vh", background: colors.ink }} />
   }
 
