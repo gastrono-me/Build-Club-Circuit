@@ -92,7 +92,7 @@ export function EventDetailView({ slug }: { slug: string }) {
         <ArrowLeft size={13} /> Events
       </Link>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing[3], marginBottom: spacing[5] }}>
+      <div className="event-detail-hero" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing[3], marginBottom: spacing[5] }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <PhaseBadge phase={phase} />
           <h1
@@ -138,7 +138,7 @@ export function EventDetailView({ slug }: { slug: string }) {
           )}
         </div>
 
-        <div style={{ display: "flex", gap: spacing[2], flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="event-detail-actions" style={{ display: "flex", gap: spacing[2], flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {isAdmin && (
             <Link href={`/events/${event.slug}/board`} style={{ textDecoration: "none" }}>
               <Button variant="secondary" size="sm" icon={<MonitorPlay size={14} />}>Live board</Button>
