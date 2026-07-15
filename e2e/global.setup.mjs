@@ -26,8 +26,8 @@ export default async function globalSetup() {
            looking = array['Collaboration']::text[],
            onboarded_at = coalesce(onboarded_at, now()),
            updated_at = now()
-       where id = any($3::uuid[])`,
-      [adminId, builderId, [adminId, builderId]],
+       where id = any($2::uuid[])`,
+      [adminId, [adminId, builderId]],
     )
     await client.query("insert into public.admins(user_id) values ($1) on conflict (user_id) do nothing", [adminId])
     await client.query("delete from public.admins where user_id = $1", [builderId])
