@@ -7,8 +7,8 @@ import { cookies } from 'next/headers'
  *
  * Must be called inside an async server context — never at module top-level.
  */
-export const createServerClient = () => {
-  const cookieStore = cookies()
+export const createServerClient = async () => {
+  const cookieStore = await cookies()
 
   return _createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),

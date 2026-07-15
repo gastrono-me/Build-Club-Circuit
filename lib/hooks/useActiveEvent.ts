@@ -16,7 +16,7 @@ export function useActiveEvent(now: Date | null): { active: EventRow | null; loa
   const active = useMemo(() => {
     if (!now) return null
     const live = events
-      .filter((e) => joined.has(e.id) && eventStatus(e.starts_at, e.ends_at, now).phase === "live")
+      .filter((e) => joined.has(e.id) && eventStatus(e.starts_at, e.ends_at, now, e.cancelled_at).phase === "live")
       .sort((a, b) => b.starts_at.localeCompare(a.starts_at))
     return live[0] ?? null
   }, [events, joined, now])

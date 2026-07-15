@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Linkedin, Github, Twitter, Instagram, ExternalLink, MessageCircle, CalendarDays, Sparkles } from "lucide-react"
+import { AtSign, BriefcaseBusiness, Camera, Code2, ExternalLink, MessageCircle, CalendarDays, Sparkles } from "lucide-react"
 import { Card } from "@/components/ui/Card"
 import { Tag } from "@/components/ui/Tag"
 import { Button } from "@/components/ui/Button"
@@ -74,14 +74,14 @@ export function PersonCard({ person, me, reason, isSelf }: PersonCardProps) {
     socialLinks.push({
       href: person.links.linkedin,
       label: "LinkedIn",
-      icon: <Linkedin size={14} />,
+      icon: <BriefcaseBusiness size={14} />,
     })
   }
   if (person.links?.github) {
     socialLinks.push({
       href: person.links.github,
       label: "GitHub",
-      icon: <Github size={14} />,
+      icon: <Code2 size={14} />,
     })
   }
   const xHref = person.links?.x
@@ -90,14 +90,14 @@ export function PersonCard({ person, me, reason, isSelf }: PersonCardProps) {
     socialLinks.push({
       href: xHref,
       label: "X / Twitter",
-      icon: <Twitter size={14} />,
+      icon: <AtSign size={14} />,
     })
   }
   if (person.links?.instagram) {
     socialLinks.push({
       href: person.links.instagram,
       label: "Instagram",
-      icon: <Instagram size={14} />,
+      icon: <Camera size={14} />,
     })
   }
 

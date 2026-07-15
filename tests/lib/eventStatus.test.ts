@@ -32,6 +32,17 @@ describe("eventStatus", () => {
     const s = eventStatus("2026-06-20T00:00:00Z", NOW.toISOString(), NOW)
     expect(s.phase).toBe("ended")
   })
+
+  it("treats a cancelled event as cancelled regardless of its dates", () => {
+    const s = eventStatus(
+      "2026-06-25T00:00:00Z",
+      "2026-06-29T00:00:00Z",
+      NOW,
+      "2026-06-26T11:00:00Z",
+    )
+    expect(s.phase).toBe("cancelled")
+    expect(s.msUntilNext).toBe(0)
+  })
 })
 
 describe("pickActiveEvent", () => {
@@ -60,5 +71,13 @@ describe("pickActiveEvent", () => {
   it("returns null when everything has ended", () => {
     const past = ev("2026-06-01T00:00:00Z", "2026-06-05T00:00:00Z")
     expect(pickActiveEvent([past], NOW)).toBeNull()
+  })
+
+  it("does not select a cancelled live event", () => {
+    const cancelled = {
+      ...ev("2026-06-25T00:00:00Z", "2026-06-29T00:00:00Z"),
+      cancelled_at: "2026-06-26T11:00:00Z",
+    }
+    expect(pickActiveEvent([cancelled], NOW)).toBeNull()
   })
 })

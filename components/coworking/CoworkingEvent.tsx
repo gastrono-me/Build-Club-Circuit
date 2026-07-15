@@ -23,15 +23,18 @@ interface Props {
   startsAt: string
   endsAt: string
   capacity: number | null
+  cancelled?: boolean
 }
 
-export function CoworkingEvent({ eventId, eventName, startsAt, endsAt, capacity }: Props) {
+export function CoworkingEvent({ eventId, eventName, startsAt, endsAt, capacity, cancelled = false }: Props) {
   const coworking = useCoworking(eventId, startsAt, endsAt)
   const { isAdmin } = useIsAdmin()
   const now = new Date()
-  const eventIsOpen = now >= new Date(startsAt) && now < new Date(endsAt)
+  const eventIsOpen = !cancelled && now >= new Date(startsAt) && now < new Date(endsAt)
   const isFull = capacity !== null && coworking.activeCheckins.length >= capacity
-  const closedMessage = now < new Date(startsAt)
+  const closedMessage = cancelled
+    ? "This event was cancelled. Live coworking is closed."
+    : now < new Date(startsAt)
     ? "Check-in opens when the event starts."
     : "Check-in has closed for this event."
 
@@ -305,6 +308,7 @@ function Huddles({ coworking, startsAt, endsAt }: { coworking: CoworkingApi; sta
   const [industries, setIndustries] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [busyHuddleId, setBusyHuddleId] = useState<string | null>(null)
   const now = new Date()
   const shown = coworking.huddles.filter((huddle) => huddlePhase(huddle.starts_at, huddle.ends_at, huddle.status, now) !== "cancelled")
 
@@ -327,6 +331,18 @@ function Huddles({ coworking, startsAt, endsAt }: { coworking: CoworkingApi; sta
 
   function toggle(list: string[], setList: (value: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value])
+  }
+
+  async function toggleHuddle(huddleId: string, joined: boolean) {
+    setBusyHuddleId(huddleId)
+    setError(null)
+    try {
+      await (joined ? coworking.leaveHuddle(huddleId) : coworking.joinHuddle(huddleId))
+    } catch (err: any) {
+      setError(err?.message ?? "Could not update huddle attendance")
+    } finally {
+      setBusyHuddleId(null)
+    }
   }
 
   return (
@@ -366,6 +382,8 @@ function Huddles({ coworking, startsAt, endsAt }: { coworking: CoworkingApi; sta
         </Card>
       )}
 
+      {!open && error && <div role="alert" style={{ ...errorStyle, marginBottom: spacing[3] }}>{error}</div>}
+
       {shown.length === 0 ? (
         <div style={emptyStyle}>No huddles booked yet.</div>
       ) : (
@@ -375,7 +393,7 @@ function Huddles({ coworking, startsAt, endsAt }: { coworking: CoworkingApi; sta
             const joined = !!coworking.userId && huddle.participant_ids.includes(coworking.userId)
             const own = coworking.userId === huddle.host_id
             return (
-              <Card key={huddle.id} padding={spacing[3]} spine={phase === "live" ? "go" : "none"}>
+              <Card key={huddle.id} padding={spacing[3]} spine={phase === "live" ? "go" : "none"} data-testid="huddle-card">
                 <div style={{ display: "flex", alignItems: "center", gap: spacing[3] }}>
                   <Avatar name={huddle.host_name} photo={huddle.host_avatar} size={34} />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -385,7 +403,7 @@ function Huddles({ coworking, startsAt, endsAt }: { coworking: CoworkingApi; sta
                   {own ? (
                     phase !== "ended" && <Button size="sm" variant="danger" onClick={() => coworking.setHuddleStatus(huddle.id, "cancelled")}>Cancel</Button>
                   ) : coworking.myCheckin && phase !== "ended" ? (
-                    <Button size="sm" variant={joined ? "ghost" : "secondary"} onClick={() => joined ? coworking.leaveHuddle(huddle.id) : coworking.joinHuddle(huddle.id)}>{joined ? "Leave" : "Join"}</Button>
+                    <Button size="sm" variant={joined ? "ghost" : "secondary"} disabled={busyHuddleId === huddle.id} onClick={() => toggleHuddle(huddle.id, joined)}>{busyHuddleId === huddle.id ? "…" : joined ? "Leave" : "Join"}</Button>
                   ) : null}
                 </div>
               </Card>

@@ -12,6 +12,8 @@ export interface EventRow {
   capacity: number | null
   starts_at: string
   ends_at: string
+  cancelled_at: string | null
+  archived_at: string | null
   created_by: string | null
   created_at: string
 }
@@ -21,7 +23,7 @@ export interface EventRow {
  * useBuildLog: fetch-all on mount, re-fetch on any change, plus join/leave
  * mutations that flip your own membership row.
  */
-export function useEvents() {
+export function useEvents({ includeArchived = false }: { includeArchived?: boolean } = {}) {
   const [events, setEvents] = useState<EventRow[]>([])
   const [joined, setJoined] = useState<Set<string>>(new Set())
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
@@ -34,7 +36,7 @@ export function useEvents() {
   // the same already-subscribed "events" channel and throw "cannot add
   // postgres_changes callbacks ... after subscribe()". Distinct topics keep each
   // instance's subscription independent.
-  const topicRef = useRef<string>()
+  const topicRef = useRef<string | null>(null)
   if (!topicRef.current) topicRef.current = `events-${Math.random().toString(36).slice(2)}`
 
   const fetchAll = useCallback(async () => {
@@ -44,10 +46,12 @@ export function useEvents() {
     const uid = user?.id ?? null
     setUserId(uid)
 
-    const { data: eventData, error: eventErr } = await supabase
+    let eventQuery = supabase
       .from("events")
-      .select("id, slug, name, tagline, location, capacity, starts_at, ends_at, created_by, created_at")
+      .select("id, slug, name, tagline, location, capacity, starts_at, ends_at, cancelled_at, archived_at, created_by, created_at")
       .order("starts_at", { ascending: true })
+    if (!includeArchived) eventQuery = eventQuery.is("archived_at", null)
+    const { data: eventData, error: eventErr } = await eventQuery
 
     if (eventErr) console.error("[useEvents] events fetch error:", eventErr)
 
@@ -68,7 +72,7 @@ export function useEvents() {
     setMemberCounts(counts)
     setJoined(mine)
     setLoading(false)
-  }, [])
+  }, [includeArchived])
 
   useEffect(() => {
     fetchAll()
@@ -137,7 +141,7 @@ export function useEvents() {
         ends_at: input.ends_at,
         created_by: user.id,
       })
-      .select("id, slug, name, tagline, location, capacity, starts_at, ends_at, created_by, created_at")
+      .select("id, slug, name, tagline, location, capacity, starts_at, ends_at, cancelled_at, archived_at, created_by, created_at")
       .single()
     if (error) throw error
     await fetchAll()
@@ -167,5 +171,16 @@ export function useEvents() {
     await fetchAll()
   }, [fetchAll])
 
-  return { events, joined, memberCounts, loading, userId, join, leave, create, update, remove }
+  const setLifecycle = useCallback(async (eventId: string, values: { cancelled_at?: string | null; archived_at?: string | null }): Promise<void> => {
+    const { error } = await createClient().from("events").update(values).eq("id", eventId)
+    if (error) throw error
+    await fetchAll()
+  }, [fetchAll])
+
+  const cancel = useCallback((eventId: string) => setLifecycle(eventId, { cancelled_at: new Date().toISOString() }), [setLifecycle])
+  const reopen = useCallback((eventId: string) => setLifecycle(eventId, { cancelled_at: null }), [setLifecycle])
+  const archive = useCallback((eventId: string) => setLifecycle(eventId, { archived_at: new Date().toISOString() }), [setLifecycle])
+  const restore = useCallback((eventId: string) => setLifecycle(eventId, { archived_at: null }), [setLifecycle])
+
+  return { events, joined, memberCounts, loading, userId, join, leave, create, update, remove, cancel, reopen, archive, restore }
 }

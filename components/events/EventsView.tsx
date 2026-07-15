@@ -28,8 +28,8 @@ export function EventsView() {
   const sorted = useMemo(() => {
     if (!now) return events
     return [...events].sort((a, b) => {
-      const pa = PHASE_ORDER[eventStatus(a.starts_at, a.ends_at, now).phase]
-      const pb = PHASE_ORDER[eventStatus(b.starts_at, b.ends_at, now).phase]
+      const pa = PHASE_ORDER[eventStatus(a.starts_at, a.ends_at, now, a.cancelled_at).phase]
+      const pb = PHASE_ORDER[eventStatus(b.starts_at, b.ends_at, now, b.cancelled_at).phase]
       if (pa !== pb) return pa - pb
       return a.starts_at.localeCompare(b.starts_at)
     })
@@ -99,7 +99,7 @@ function EventCard({
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { phase, msUntilNext } = eventStatus(event.starts_at, event.ends_at, now)
+  const { phase, msUntilNext } = eventStatus(event.starts_at, event.ends_at, now, event.cancelled_at)
 
   async function toggle() {
     setBusy(true)
@@ -162,7 +162,7 @@ function EventCard({
           )}
         </div>
 
-        {phase !== "ended" && (
+        {phase !== "ended" && phase !== "cancelled" && (
           <Button
             variant={joined ? "secondary" : "accent"}
             size="sm"
@@ -184,6 +184,7 @@ function PhaseBadge({ phase, msUntilNext }: { phase: EventPhase; msUntilNext: nu
     live: { label: "LIVE", color: colors.oxblood, bg: colors.liveSoft },
     upcoming: { label: "UPCOMING", color: colors.violet, bg: colors.violetSoft },
     ended: { label: "ENDED", color: colors.muted, bg: colors.paper2 },
+    cancelled: { label: "CANCELLED", color: colors.oxblood, bg: colors.liveSoft },
   }
   const m = map[phase]
   const detail =

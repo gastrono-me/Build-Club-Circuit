@@ -22,8 +22,8 @@ export function UpcomingEventsStrip({ now }: { now: Date }) {
   // Live first, then upcoming soonest-first. Ended events don't appear here.
   const current = React.useMemo(() => {
     return events
-      .map((e) => ({ e, phase: eventStatus(e.starts_at, e.ends_at, now).phase }))
-      .filter((x) => x.phase !== "ended")
+      .map((e) => ({ e, phase: eventStatus(e.starts_at, e.ends_at, now, e.cancelled_at).phase }))
+      .filter((x) => x.phase === "live" || x.phase === "upcoming")
       .sort((a, b) => {
         if (a.phase !== b.phase) return a.phase === "live" ? -1 : 1
         return a.e.starts_at.localeCompare(b.e.starts_at)

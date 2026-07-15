@@ -58,7 +58,7 @@ export function EventDetailView({ slug }: { slug: string }) {
   }
 
   const eventId = event.id
-  const { phase } = eventStatus(event.starts_at, event.ends_at, now)
+  const { phase } = eventStatus(event.starts_at, event.ends_at, now, event.cancelled_at)
   const isJoined = joined.has(event.id)
   const memberCount = memberCounts[event.id] ?? 0
 
@@ -144,7 +144,7 @@ export function EventDetailView({ slug }: { slug: string }) {
               <Button variant="secondary" size="sm" icon={<MonitorPlay size={14} />}>Live board</Button>
             </Link>
           )}
-          {phase !== "ended" && (
+          {phase !== "ended" && phase !== "cancelled" && (
             <Button
               variant={isJoined ? "secondary" : "accent"}
               size="sm"
@@ -164,6 +164,7 @@ export function EventDetailView({ slug }: { slug: string }) {
         startsAt={event.starts_at}
         endsAt={event.ends_at}
         capacity={event.capacity}
+        cancelled={phase === "cancelled"}
       />
 
       {/* Event-scoped vs global roll-up toggle */}
@@ -238,6 +239,7 @@ function PhaseBadge({ phase }: { phase: EventPhase }) {
     live: { label: "LIVE", color: colors.oxblood, bg: colors.liveSoft },
     upcoming: { label: "UPCOMING", color: colors.violet, bg: colors.violetSoft },
     ended: { label: "ENDED", color: colors.muted, bg: colors.paper2 },
+    cancelled: { label: "CANCELLED", color: colors.oxblood, bg: colors.liveSoft },
   }
   const m = map[phase]
   return (
