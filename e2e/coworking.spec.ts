@@ -56,10 +56,14 @@ test.describe.serial("non-production coworking release gate", () => {
     await page.getByPlaceholder("Brief description: what did you just get working?").fill(SHIP_NOTE)
     await expect(page.getByText(`Count this toward ${MAIN_NAME}`)).toBeVisible()
     await page.getByRole("button", { name: "Post update" }).click()
-    await expect(page.getByText(SHIP_NOTE, { exact: true })).toBeVisible()
+    // A click only starts the async Supabase mutation. Wait for the composer to
+    // clear (the durable-success signal) before navigating away, then verify the
+    // saved ship is rendered outside the form.
+    await expect(page.getByPlaceholder("Brief description: what did you just get working?")).toBeEmpty()
+    await expect(page.getByRole("region", { name: "Shipped today" }).getByText(SHIP_NOTE, { exact: true })).toBeVisible()
 
     await page.goto(`/events/${MAIN_SLUG}`)
-    await page.locator("select").filter({ has: page.locator(`option`, { hasText: SHIP_NOTE }) }).selectOption({ label: SHIP_NOTE })
+    await page.getByLabel("Ship for lightning demo").selectOption({ label: SHIP_NOTE })
     await page.getByRole("button", { name: "Join queue" }).click()
     await expect(page.getByText("queued", { exact: true })).toBeVisible()
 

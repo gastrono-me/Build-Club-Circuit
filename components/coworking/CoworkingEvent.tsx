@@ -425,7 +425,7 @@ function DemoQueue({ coworking, isAdmin }: { coworking: CoworkingApi; isAdmin: b
         coworking.myShips.length > 0 ? (
           <Card padding={spacing[3]} style={{ marginBottom: spacing[3] }}>
             <div style={{ display: "flex", gap: spacing[2], alignItems: "center", flexWrap: "wrap" }}>
-              <select value={shipId} onChange={(e) => setShipId(e.target.value)} style={{ ...selectStyle, flex: "1 1 240px" }}>
+              <select aria-label="Ship for lightning demo" value={shipId} onChange={(e) => setShipId(e.target.value)} style={{ ...selectStyle, flex: "1 1 240px" }}>
                 <option value="">Choose one of your event ships</option>
                 {coworking.myShips.map((ship) => <option key={ship.id} value={ship.id}>{ship.note.slice(0, 80)}</option>)}
               </select>
