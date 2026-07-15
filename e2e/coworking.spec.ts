@@ -26,6 +26,10 @@ async function fillCheckIn(page: Page, intention: string) {
 
 test.describe.serial("non-production coworking release gate", () => {
   test("protects signed-out and staff-only routes", async ({ browser, page }) => {
+    const health = await page.request.get("/api/health")
+    expect(health.ok()).toBe(true)
+    await expect(health.json()).resolves.toMatchObject({ status: "ok", service: "circuit" })
+
     await page.goto(`/events/${MAIN_SLUG}`)
     await expect(page).toHaveURL(/\/$/)
 
@@ -41,6 +45,8 @@ test.describe.serial("non-production coworking release gate", () => {
     await page.getByLabel("This session I want to…").fill("Validate the full non-production coworking journey")
     await page.getByPlaceholder("Outcome 1").fill("Prove the release gate")
     await page.getByRole("button", { name: "Check in", exact: true }).click()
+    await expect(page.getByText("Checked in", { exact: true })).toBeVisible()
+    await page.reload()
     await expect(page.getByText("Checked in", { exact: true })).toBeVisible()
 
     await page.getByRole("button", { name: "Joined", exact: true }).click()

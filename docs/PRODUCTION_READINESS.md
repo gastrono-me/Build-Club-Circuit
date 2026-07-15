@@ -1,66 +1,65 @@
 # Production readiness contract
 
-This is the go/no-go contract for promoting Circuit's live coworking release from the non-production Supabase project to production. It is deliberately short: promotion is routine only when every release gate below is green.
+Circuit's merged live-coworking release is **merge-ready and verified in non-production**. Production remains intentionally untouched. Elevation is a controlled, manual action after the short production preflight below; no unresolved product or schema decision is known to block it.
 
 ## Product contract
 
-These defaults remove the remaining product ambiguity:
-
 - Circuit is the single product and system of record; live coworking is an event mode inside Circuit.
 - Build Club staff admins operate every event. `event_members` means RSVP/participation and never grants staff access.
+- Staff access is provisioned and revoked manually in `public.admins`; there is no self-promotion path.
 - Event capacity means simultaneous checked-in builders, not total RSVPs.
-- A checked-in builder must check out before leaving the event membership.
-- A named space's capacity is a real limit and must be enforced when joining a huddle in that space.
-- Builders may create and join huddles; only staff admins moderate the room, huddles, demos, and attendance.
-- Normal event lifecycle is cancel, end, then archive. Hard delete is a support-only action, not the normal staff workflow.
+- A checked-in builder must check out before leaving event membership.
+- A named space's capacity is enforced when joining a huddle in that space.
+- Builders may create and join huddles; staff admins moderate the room, huddles, demos, and attendance.
+- Normal event lifecycle is cancel, end, then archive. Hard delete is support-only.
 - Ships, blockers, projects, and relationships remain durable after presence ends or an event is archived.
-- Staff access is provisioned manually in `public.admins` for the first release, with a named approver and an offboarding checklist. There is no self-promotion path.
 
-If these defaults are accepted, no further product decision blocks implementation or launch.
+## Verified release gates
 
-## Release gates
-
-| Gate | Acceptance criteria | Current state |
+| Gate | State | Evidence |
 |---|---|---|
-| Product E2E | Builder, second-builder, and staff journeys pass against non-production on desktop and mobile, including permission denial, capacity contention, reload/realtime, and error recovery. | **Amber:** a real authenticated staff journey passed; non-admin and two-user concurrency remain unverified. |
-| Automated verification | `npm test`, `npm run build`, and `npm run e2e` run from a clean checkout and gate every PR. | **Red:** 96 unit tests and the build pass, but no committed Playwright configuration/spec exists; `npm run e2e` currently discovers Vitest files and fails. There is no application CI workflow. |
-| Product consistency | Space capacity is enforced, checked-in members cannot leave without checkout, event cancellation/archive replaces routine hard deletion, and concurrent capacity errors are user-readable. | **Red:** these edge cases are not implemented. |
-| Security | RLS and role-denial tests pass; production dependencies have no unaccepted high-severity advisories. | **Red:** RLS is strong, but the installed Next.js version currently has a high-severity production audit finding; `postcss` has a moderate finding. |
-| Environment isolation | Non-production and production Supabase project IDs, Vercel environments, OAuth redirect allowlists, secrets, and staff-admin records are documented and independently checked. No production secret is used by E2E. | **Amber:** non-production works, but the naming/redirect setup is easy to confuse and has no checked runbook. |
-| Ordered deployment | Database migration succeeds and is verified before production application traffic can receive code that requires it. A migration failure prevents deployment. | **Red:** the migration workflow and Vercel deployment currently run independently after a push to `main`. |
-| Recovery and operations | A pre-release database recovery point exists; code rollback is documented; post-deploy smoke and health checks run; failures have an owner and visible alert. | **Red:** transactional migrations help, but there is no release-level backup, automated smoke/health gate, alerting, or rollback runbook. |
+| Non-production E2E | **Green** | Five authenticated Playwright journeys pass against the designated non-production Supabase project: health/auth denial, durable builder flow, two-user final-slot race, staff operations/lifecycle, and 390px mobile. Fixtures are uniquely named and removed after every run. |
+| Automated verification | **Green** | Every PR runs clean install, 98 unit tests, production audit policy, guarded non-production migration, production build, Chromium install, and E2E. Failure traces/screenshots are retained without committing credentials. |
+| Product consistency | **Green** | Database-backed event and named-space capacity, checkout-before-leave, cancel/archive lifecycle, durable ships/demos, and readable contention errors are implemented and exercised. |
+| Security | **Green for release policy** | Staff denial and RLS-backed mutations are exercised. Production audit has zero high/critical findings. Two moderate transitive PostCSS findings remain visible because the current supported Next.js tree has no available remediation. |
+| Environment isolation | **Green in non-production** | Database migration and fixture setup refuse a connection whose project reference does not match `E2E_SUPABASE_PROJECT_REF`. E2E credentials are dedicated CI secrets. No production credential or database was used. |
+| Ordered deployment | **Green in code; not yet exercised in production** | `main` automatic Vercel production deployment is disabled. The manual production workflow builds an exact tested `main` commit, migrates the asserted production project first, deploys only after migration succeeds, then calls `/api/health`. |
+| Recovery and operations | **Manual preflight required** | Health smoke and code rollback path are documented. A production recovery point, environment secrets/reviewer, OAuth redirects, staff list, and post-release observation still require one-time production setup/confirmation. |
 
-Production is **no-go** while any red gate remains. The feature is usable in non-production; the red items are release-safety and lifecycle gaps, not evidence that the core journey is broken.
+The branch is ready to merge. Production is a **no-go only until the production preflight is checked**, not because of a known application-code blocker.
 
-## Required E2E journeys
+## Automated non-production journeys
 
-1. **Authentication:** signed-out access, sign-in callback, expired/reused callback, sign-out, and return to the intended event.
-2. **Builder:** discover event, RSVP, check in, set project/intention/focus, see another builder, create/join/leave a huddle, ship work, queue a demo, check out, and retain durable work.
-3. **Capacity:** two builders race for the final event and space slot; exactly one succeeds and the other gets a useful message.
-4. **Staff:** create/edit/cancel/archive an event, configure spaces, manage attendance/huddles/demos, use the host board, and export CSV.
-5. **Authorization:** a normal builder cannot access staff routes or mutate staff-only records; adding/removing `public.admins` grants/revokes access after session refresh.
-6. **Resilience:** refresh and reconnect during an active room, two-tab realtime updates, empty/error/loading states, and a 390-pixel mobile viewport.
+1. Health endpoint responds; signed-out users are redirected; a normal builder is denied `/admin`.
+2. A builder joins, checks in with intention/focus, survives a reload, cannot leave while checked in, creates a capacity-bound huddle, logs an event-attributed ship, queues it for a demo, checks out, and leaves.
+3. Staff and builder race for the last event slot; exactly one succeeds and the loser receives a useful capacity message.
+4. Staff checks in, observes named-space capacity enforcement, opens the host board, and cancels, archives, restores, and reopens the event while durable work remains.
+5. The event journey renders without horizontal overflow at a 390x844 viewport.
 
-E2E data must use a uniquely named fixture event and be removed after the run. Test credentials and service-role keys must stay in CI/Vercel secrets.
+Password authentication is used only for deterministic CI identities. Before the first production release, manually smoke the real magic-link/OAuth callback once—including recovery from an expired state—because email delivery and the production redirect allowlist are external configuration, not reproducible by the database E2E fixture.
 
-## Promotion runbook
+## Simple production preflight
 
-1. Cut a release commit only after all PR checks and the non-production E2E suite are green.
-2. Confirm the target Supabase project reference, Vercel project/environment, redirect allowlist, and staff-admin list; record them in the release log.
-3. Create or verify the production database recovery point and inspect the pending migration list.
-4. Apply migrations to production. Verify migration history, required tables/functions/triggers, and representative RLS allow/deny checks.
-5. Only after step 4 succeeds, deploy that exact release commit to production.
-6. Run the builder and staff smoke journeys using a clearly marked production smoke event, then remove the fixture.
-7. Monitor authentication failures, server errors, database errors, and the smoke result for the agreed observation window.
+Complete these checks once before running the release workflow:
 
-If migration fails, do not deploy. If application smoke fails, roll back the application to the previous release. Database migrations are forward-only by default: repair with a new migration unless a tested restore is explicitly safer. Any migration that is not backward-compatible with the previous application must use an expand/migrate/contract sequence across separate releases.
+1. Create the GitHub `production` environment and require the intended reviewer.
+2. Add environment secrets `PRODUCTION_SUPABASE_DB_URL`, `PRODUCTION_SUPABASE_PROJECT_REF`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`.
+3. Confirm the Supabase project ref and Vercel project are production, and that the Supabase Site URL/redirect allowlist contains the production auth callback.
+4. Add the approved Build Club staff user IDs to production `public.admins`; confirm departed staff are absent.
+5. Create or verify a production database recovery point and inspect the pending migration list.
+6. Confirm this exact commit is on `main` and its PR `nonprod-e2e` and Vercel preview checks are green.
 
-## Work needed to make promotion routine
+## Elevation
 
-1. Commit a Playwright configuration and deterministic multi-user E2E suite.
-2. Add PR CI for unit tests, production build, audit policy, and E2E.
-3. Implement the product-consistency defaults above with database-backed concurrency guarantees.
-4. Upgrade or otherwise remediate the vulnerable production dependencies and record any temporary exception with an owner and expiry.
-5. Replace parallel migration/deployment with an ordered release workflow and add environment/schema assertions, health smoke, and rollback instructions.
+Run **Release production** manually with the tested `main` commit SHA. The workflow then:
 
-Once these five items are green, production promotion becomes an execution checklist rather than a judgment call.
+1. Rejects a commit that is not on `main`.
+2. Repeats unit and high-severity dependency checks.
+3. Pulls production Vercel configuration and builds the exact commit without changing traffic.
+4. Verifies the database connection matches `PRODUCTION_SUPABASE_PROJECT_REF` and applies migrations transactionally.
+5. Deploys the prebuilt application only after migration succeeds.
+6. Fails unless `/api/health` responds successfully.
+
+After the workflow is green, manually complete a builder magic-link smoke and a staff event smoke using clearly marked, removable production data. Observe authentication failures, server errors, and database errors for the agreed window.
+
+If migration fails, the application is not deployed. If deployment or smoke fails, restore the previous Vercel application deployment. Migrations are forward-only by default: repair with a new migration unless a tested database restore is explicitly safer. Any future non-backward-compatible schema change must use expand/migrate/contract across separate releases.
