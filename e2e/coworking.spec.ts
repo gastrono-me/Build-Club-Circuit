@@ -6,10 +6,14 @@ const CAPACITY_SLUG = "e2e-capacity-race"
 const MAIN_NAME = "E2E Live Coworking"
 const HUDDLE_TOPIC = "E2E feedback huddle"
 const SHIP_NOTE = "E2E ship: durable coworking flow"
+const EVENT_NAMES: Record<string, string> = {
+  [MAIN_SLUG]: MAIN_NAME,
+  [CAPACITY_SLUG]: "E2E Capacity Race",
+}
 
 async function joinEvent(page: Page, slug: string) {
   await page.goto(`/events/${slug}`)
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
+  await expect(page.getByRole("heading", { level: 1, name: EVENT_NAMES[slug], exact: true })).toBeVisible()
   const button = page.getByRole("button", { name: "Join", exact: true }).first()
   await button.click()
   await expect(page.getByRole("button", { name: "Joined", exact: true })).toBeVisible()
