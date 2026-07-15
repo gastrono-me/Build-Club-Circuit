@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test"
 import { authenticatedPage } from "./auth"
-import { CAPACITY_SLUG, MAIN_SLUG, SHIP_PREFIX } from "./db.mjs"
 
+const MAIN_SLUG = "e2e-live-coworking"
+const CAPACITY_SLUG = "e2e-capacity-race"
 const MAIN_NAME = "E2E Live Coworking"
 const HUDDLE_TOPIC = "E2E feedback huddle"
-const SHIP_NOTE = `${SHIP_PREFIX} durable coworking flow`
+const SHIP_NOTE = "E2E ship: durable coworking flow"
 
 async function joinEvent(page: Page, slug: string) {
   await page.goto(`/events/${slug}`)
