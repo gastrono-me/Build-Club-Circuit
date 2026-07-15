@@ -109,7 +109,7 @@ test.describe.serial("non-production coworking release gate", () => {
 
     const huddle = page.getByTestId("huddle-card").filter({ hasText: HUDDLE_TOPIC })
     await huddle.getByRole("button", { name: "Join", exact: true }).click()
-    await expect(page.getByRole("alert")).toContainText("huddle space is at capacity")
+    await expect(page.getByRole("alert").filter({ hasText: "huddle space is at capacity" })).toBeVisible()
 
     await page.goto(`/events/${MAIN_SLUG}/board`)
     await expect(page.getByRole("heading", { name: MAIN_NAME })).toBeVisible()
