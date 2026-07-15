@@ -99,7 +99,8 @@ export function useEvents({ includeArchived = false }: { includeArchived?: boole
       .from("event_members")
       .insert({ event_id: eventId, user_id: user.id })
     if (error) throw error
-  }, [])
+    await fetchAll()
+  }, [fetchAll])
 
   const leave = useCallback(async (eventId: string) => {
     const supabase = createClient()
@@ -111,7 +112,8 @@ export function useEvents({ includeArchived = false }: { includeArchived?: boole
       .eq("event_id", eventId)
       .eq("user_id", user.id)
     if (error) throw error
-  }, [])
+    await fetchAll()
+  }, [fetchAll])
 
   /** The editable fields of an event. Phase/status is derived from the dates. */
   interface EventInput {
