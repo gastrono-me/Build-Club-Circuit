@@ -6,6 +6,8 @@ The everyday tool for Build Club builders. Circuit is **evergreen**: it works da
 
 One shell, one nav, every destination always reachable (no mode gate). `lib/nav.ts` is the single source of `NAV_GROUPS`, rendered by `Nav`/`MobileMenu` (plus `MobileTabBar` for the bottom tabs): **Your build** (Today · Projects) · **Community** (Explore · People · Events · Admin for staff). Ships and blockers share one taxonomy, `lib/data/work-categories.ts` (discipline-spanning: Product/Engineering/Design/Growth/Sales/…), which also drives the embedding-field anchors in `lib/config/event.ts`.
 
+**Live coworking is an event state, not a second product mode.** During an event, builders check in with a project, goal, intention, and up to three focus outcomes; see explainable live matches; create or join targeted huddles; and queue an event-linked ship for a demo. Staff configure capacity and spaces, operate the session at `/admin/events/[id]`, and project `/events/[slug]/board`. Circuit remains the system of record for identity, projects, ships, blockers, messages, and events. See `docs/LIVE_COWORKING.md`.
+
 > Heritage: Circuit grew out of **Vector**, an in-event toolkit built for Agentic AI Build Week (AABW). `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and `docs/DEVPOST.md` still describe the Vector era and are accurate for the event-side architecture, but predate the Circuit pivot — read them with that in mind.
 
 **Read next:** `docs/ARCHITECTURE.md` (how it's built) and `docs/ROADMAP.md` (what's left + known issues). This file is the orientation; those have the detail.
@@ -21,7 +23,7 @@ npm run dev                     # http://localhost:3000
 npm run test                    # vitest (pure logic in lib/)
 npm run build                   # production build
 ```
-You need a Supabase project with the schema applied. **Migrations are automated**: pushing to `main` runs `.github/workflows/migrate.yml` (`scripts/migrate.mjs`), which applies any new `db/migrations/*.sql` and tracks them in `public._migrations` (needs the `SUPABASE_DB_URL` repo secret — the **Session pooler** connection string, port 5432). For a brand-new project you can instead paste `db/setup_all.sql` + `db/seed.sql` into the SQL editor once. Then in `.env.local`:
+You need a Supabase project with the schema applied. **Migrations are automated**: pushing to `main` runs `.github/workflows/migrate.yml` (`scripts/migrate.mjs`), which applies any new `db/migrations/*.sql` and tracks them in `public._migrations` (needs the `SUPABASE_DB_URL` repo secret — the **Session pooler** connection string, port 5432). For a brand-new project you can instead paste `db/setup_all.sql` into the SQL editor once; it includes the seed. Regenerate that bundle with `npm run db:bundle`. Then in `.env.local`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable / anon key>
@@ -36,8 +38,8 @@ Email magic-link sign-in works with no extra setup. Google/GitHub OAuth need pro
 5. **Deploys are Git-integrated.** The Vercel project `buildclubvector/build-club-circuit` is connected to this repo (https://vercel.com/buildclubvector/build-club-circuit), so pushing to `main` auto-deploys Production and branches/PRs get Preview deploys — no CLI needed. (Vector used the `vercel --prod` CLI because that account lacked GitHub-org access; Circuit doesn't.) `.vercelignore` still keeps `.env*`, `docs`, and local scratch out of any manual CLI upload.
 
 ## What's real vs seeded (important context)
-- **Real / persisted:** everything user-facing — accounts (magic-link; OAuth when configured), profiles, ships (with photo/file/link attachments in the public `ships` bucket) + cheers + spotlight nominations, blockers + me-toos, projects (labels, links), direct messages, calendar catchups, and the notifications bell (messages + catchup requests + cheers on your ships, read cursor in `activity_reads`). Live updates fan out over a shared Realtime **Broadcast** bus (`lib/realtime/feedBus.ts`), not per-row postgres_changes.
-- **Seeded:** a few starter community blockers and the two events in `db/seed.sql`. Events are managed by staff from `/admin` (create/edit/delete). Staff = a row in `public.admins`, a deliberately separate table (not a self-grantable `profiles` flag); bootstrap the first admin from the SQL editor (`insert into public.admins (user_id) values ('<uuid>')`). Admin-only writes are enforced by RLS `is_admin()`; the `/admin` route + the "Admin" nav item are gated by `useIsAdmin`.
+- **Real / persisted:** everything user-facing — accounts (magic-link; OAuth when configured), profiles, ships (with photo/file/link attachments in the public `ships` bucket) + cheers + spotlight nominations, blockers + me-toos, projects (labels, links), direct messages, calendar catchups, live event check-ins/focus/huddles/demo queue, and the notifications bell (messages + catchup requests + cheers + targeted huddle alerts). Global feed updates fan out over a shared Realtime **Broadcast** bus (`lib/realtime/feedBus.ts`); bounded live-event tables use filtered Postgres Changes subscriptions.
+- **Seeded:** only the two starter events in `db/seed.sql`. Events are managed by staff from `/admin` (create/edit/delete/operate). Staff = a row in `public.admins`, a deliberately separate table (not a self-grantable `profiles` flag); bootstrap the first admin from the SQL editor (`insert into public.admins (user_id) values ('<uuid>')`). Admin-only writes are enforced by RLS `is_admin()`; the admin routes + nav item are gated by `useIsAdmin`.
 - **AI:** local-logic fallbacks only (no token spend) — match reasons in People (`lib/ai/local-fallbacks.ts`). There is no server-side AI proxy; add one deliberately if a real AI feature lands.
 
 ## Conventions

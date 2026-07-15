@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import Link from "next/link"
-import { CalendarRange, Pencil, Trash2, Plus, MonitorPlay } from "lucide-react"
+import { CalendarRange, Pencil, Trash2, Plus, MonitorPlay, SlidersHorizontal } from "lucide-react"
 import { useEvents, type EventRow } from "@/lib/hooks/useEvents"
 import { eventStatus } from "@/lib/events/eventStatus"
 import { SectionTitle } from "@/components/ui/SectionTitle"
@@ -32,11 +32,12 @@ interface Draft {
   name: string
   tagline: string
   location: string
+  capacity: string
   starts_at: string // datetime-local value
   ends_at: string
 }
 
-const EMPTY: Draft = { slug: "", name: "", tagline: "", location: "", starts_at: "", ends_at: "" }
+const EMPTY: Draft = { slug: "", name: "", tagline: "", location: "", capacity: "", starts_at: "", ends_at: "" }
 
 export function AdminView() {
   const { events, memberCounts, loading, create, update, remove } = useEvents()
@@ -57,6 +58,7 @@ export function AdminView() {
       name: e.name,
       tagline: e.tagline ?? "",
       location: e.location ?? "",
+      capacity: e.capacity ? String(e.capacity) : "",
       starts_at: toLocalInput(e.starts_at),
       ends_at: toLocalInput(e.ends_at),
     })
@@ -80,6 +82,7 @@ export function AdminView() {
         name: draft.name,
         tagline: draft.tagline,
         location: draft.location,
+        capacity: draft.capacity ? Number(draft.capacity) : null,
         starts_at: fromLocalInput(draft.starts_at),
         ends_at: fromLocalInput(draft.ends_at),
       }
@@ -135,6 +138,7 @@ export function AdminView() {
             <Input label="Slug (URL handle)" value={draft.slug} onChange={(e) => { setSlugTouched(true); setDraft((d) => ({ ...d, slug: slugify(e.target.value) })) }} placeholder="circuit-sprint" required />
             <Input label="Tagline (optional)" value={draft.tagline} onChange={(e) => setDraft((d) => ({ ...d, tagline: e.target.value }))} placeholder="A weekend to ship your next thing." />
             <Input label="Location (optional)" value={draft.location} onChange={(e) => setDraft((d) => ({ ...d, location: e.target.value }))} placeholder="Online, or a city" />
+            <Input label="Capacity (optional)" type="number" min="1" value={draft.capacity} onChange={(e) => setDraft((d) => ({ ...d, capacity: e.target.value }))} placeholder="80" />
             <div style={{ display: "flex", gap: spacing[3], flexWrap: "wrap" }}>
               <label style={{ flex: "1 1 160px", ...labelStyle }}>
                 <span style={labelText}>Starts</span>
@@ -178,7 +182,13 @@ export function AdminView() {
                     </div>
                     {ev.tagline && <div style={{ fontFamily: fonts.body, fontSize: fontSize.meta, color: colors.muted, marginTop: spacing[1] }}>{ev.tagline}</div>}
                   </div>
-                  <div style={{ display: "flex", gap: spacing[1], flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: spacing[1], flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <Link href={`/admin/events/${ev.id}`} style={{ textDecoration: "none" }}>
+                      <Button variant="ghost" size="sm" icon={<SlidersHorizontal size={13} />}>Operate</Button>
+                    </Link>
+                    <Link href={`/events/${ev.slug}/board`} style={{ textDecoration: "none" }}>
+                      <Button variant="ghost" size="sm" icon={<MonitorPlay size={13} />}>Board</Button>
+                    </Link>
                     <Button variant="ghost" size="sm" icon={<Pencil size={13} />} onClick={() => openEdit(ev)}>Edit</Button>
                     <Button variant="danger" size="sm" icon={<Trash2 size={13} />} onClick={() => handleDelete(ev)}>Delete</Button>
                   </div>

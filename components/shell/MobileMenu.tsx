@@ -8,7 +8,7 @@ import { colors, fonts, fontSize, fontWeight, spacing, radii, shadows, motion } 
 import { NAV_GROUPS, isActivePath, type NavItem } from "@/lib/nav"
 import { GroupLabel } from "@/components/shell/Nav"
 import { Avatar } from "@/components/shell/Avatar"
-import { CatchupRequestRow, ActivityNotificationRow, MessageRow } from "@/components/shell/NotificationItems"
+import { CatchupRequestRow, ActivityNotificationRow, EventAlertRow, MessageRow } from "@/components/shell/NotificationItems"
 import { useProfile } from "@/lib/hooks/useProfile"
 import { useIsAdmin } from "@/lib/hooks/useIsAdmin"
 import { useSocial } from "@/components/shell/SocialProvider"
@@ -24,8 +24,8 @@ export function MobileMenu() {
   const avatar_url = profile?.avatar_url
 
   const { isAdmin } = useIsAdmin()
-  const { inbox, totalUnread, pendingCatchups, openPanel, activity, unreadActivity, markActivityRead } = useSocial()
-  const notificationCount = totalUnread + pendingCatchups.length + unreadActivity
+  const { inbox, totalUnread, pendingCatchups, openPanel, activity, unreadActivity, markActivityRead, eventNotifications, unreadEventNotifications, markEventNotificationRead } = useSocial()
+  const notificationCount = totalUnread + pendingCatchups.length + unreadActivity + unreadEventNotifications
   const badgeCount = notificationCount > 9 ? "9+" : String(notificationCount)
 
   // Opening the drawer surfaces the cheers, so mark them seen (same rationale as
@@ -200,6 +200,26 @@ export function MobileMenu() {
           </div>
 
           <div style={{ height: 1, background: colors.line, margin: `0 ${spacing[3]}px` }} />
+
+          {eventNotifications.length > 0 && (
+            <div style={{ padding: spacing[3] }}>
+              <div style={{ fontFamily: fonts.mono, fontSize: fontSize.label, color: colors.mutedSoft, letterSpacing: "0.06em", marginBottom: spacing[2] }}>
+                LIVE EVENT
+              </div>
+              {eventNotifications.map((notification) => (
+                <EventAlertRow
+                  key={notification.id}
+                  notification={notification}
+                  variant="drawer"
+                  onClick={() => {
+                    markEventNotificationRead(notification.id)
+                    router.push(notification.event_slug ? `/events/${notification.event_slug}` : "/events")
+                    setOpen(false)
+                  }}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Catchup requests */}
           {pendingCatchups.length > 0 && (

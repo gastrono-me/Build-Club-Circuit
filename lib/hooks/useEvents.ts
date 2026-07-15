@@ -9,6 +9,7 @@ export interface EventRow {
   name: string
   tagline: string | null
   location: string | null
+  capacity: number | null
   starts_at: string
   ends_at: string
   created_by: string | null
@@ -45,7 +46,7 @@ export function useEvents() {
 
     const { data: eventData, error: eventErr } = await supabase
       .from("events")
-      .select("id, slug, name, tagline, location, starts_at, ends_at, created_by, created_at")
+      .select("id, slug, name, tagline, location, capacity, starts_at, ends_at, created_by, created_at")
       .order("starts_at", { ascending: true })
 
     if (eventErr) console.error("[useEvents] events fetch error:", eventErr)
@@ -114,6 +115,7 @@ export function useEvents() {
     name: string
     tagline?: string | null
     location?: string | null
+    capacity?: number | null
     starts_at: string
     ends_at: string
   }
@@ -130,11 +132,12 @@ export function useEvents() {
         name: input.name.trim(),
         tagline: input.tagline?.trim() || null,
         location: input.location?.trim() || null,
+        capacity: input.capacity ?? null,
         starts_at: input.starts_at,
         ends_at: input.ends_at,
         created_by: user.id,
       })
-      .select("id, slug, name, tagline, location, starts_at, ends_at, created_by, created_at")
+      .select("id, slug, name, tagline, location, capacity, starts_at, ends_at, created_by, created_at")
       .single()
     if (error) throw error
     await fetchAll()
@@ -149,6 +152,7 @@ export function useEvents() {
         name: input.name.trim(),
         tagline: input.tagline?.trim() || null,
         location: input.location?.trim() || null,
+        capacity: input.capacity ?? null,
         starts_at: input.starts_at,
         ends_at: input.ends_at,
       })

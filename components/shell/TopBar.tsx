@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
 import { MobileMenu } from "@/components/shell/MobileMenu"
 import { Avatar } from "@/components/shell/Avatar"
-import { CatchupRequestRow, ActivityNotificationRow, MessageRow } from "@/components/shell/NotificationItems"
+import { CatchupRequestRow, ActivityNotificationRow, EventAlertRow, MessageRow } from "@/components/shell/NotificationItems"
 import { useProfile } from "@/lib/hooks/useProfile"
 import { useSocial } from "@/components/shell/SocialProvider"
 import {
@@ -25,11 +25,11 @@ export function TopBar() {
   const name = loading || !profile ? "Profile" : profile.name || "Profile"
   const avatar_url = profile?.avatar_url
 
-  const { inbox, totalUnread, pendingCatchups, openPanel, activity, unreadActivity, markActivityRead } = useSocial()
+  const { inbox, totalUnread, pendingCatchups, openPanel, activity, unreadActivity, markActivityRead, eventNotifications, unreadEventNotifications, markEventNotificationRead } = useSocial()
   const router = useRouter()
   const [open, setOpen] = useState(false)
 
-  const notificationCount = totalUnread + pendingCatchups.length + unreadActivity
+  const notificationCount = totalUnread + pendingCatchups.length + unreadActivity + unreadEventNotifications
   const badgeCount = notificationCount > 9 ? "9+" : String(notificationCount)
 
   // Opening the bell is the "seen" moment for cheers — there's no deeper view
@@ -180,6 +180,19 @@ export function TopBar() {
               zIndex: 99,
             }}
           >
+            {eventNotifications.map((notification) => (
+              <EventAlertRow
+                key={`event-${notification.id}`}
+                notification={notification}
+                variant="dropdown"
+                onClick={() => {
+                  markEventNotificationRead(notification.id)
+                  router.push(notification.event_slug ? `/events/${notification.event_slug}` : "/events")
+                  setOpen(false)
+                }}
+              />
+            ))}
+
             {pendingCatchups.map((c) => (
               <CatchupRequestRow
                 key={`catchup-${c.id}`}
@@ -205,7 +218,7 @@ export function TopBar() {
               />
             ))}
 
-            {inbox.length === 0 && pendingCatchups.length === 0 && activity.length === 0 ? (
+            {inbox.length === 0 && pendingCatchups.length === 0 && activity.length === 0 && eventNotifications.length === 0 ? (
               <div
                 style={{
                   padding: `${spacing[4]}px`,
