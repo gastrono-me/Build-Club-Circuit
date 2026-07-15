@@ -85,9 +85,16 @@ test.describe.serial("non-production coworking release gate", () => {
       builder.page.getByRole("button", { name: "Check in", exact: true }).click(),
     ])
 
+    // Both form handlers continue asynchronously after the browser clicks.
+    // Poll until the database-serialized outcome is rendered on one page.
+    await expect.poll(async () => {
+      const [adminWon, builderWon] = await Promise.all([
+        admin.page.getByText("Checked in", { exact: true }).isVisible(),
+        builder.page.getByText("Checked in", { exact: true }).isVisible(),
+      ])
+      return Number(adminWon) + Number(builderWon)
+    }).toBe(1)
     const adminWon = await admin.page.getByText("Checked in", { exact: true }).isVisible()
-    const builderWon = await builder.page.getByText("Checked in", { exact: true }).isVisible()
-    expect(Number(adminWon) + Number(builderWon)).toBe(1)
     const loser = adminWon ? builder.page : admin.page
     await expect(loser.getByText(/at (its 1-builder )?capacity/i)).toBeVisible()
     await admin.context.close()
